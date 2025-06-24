@@ -10,17 +10,6 @@ from unittest.mock import patch, MagicMock
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
-# Mock pyopenms before importing - required since pyopenms may not be available in test environment
-mock_poms = MagicMock()
-mock_poms.__version__ = "2.9.1"
-mock_mod_db = MagicMock()
-mock_mod = MagicMock()
-mock_mod.getId.return_value = "Oxidation"
-mock_mod.getDiffMonoMass.return_value = 15.994915
-mock_mod_db.getModification.return_value = mock_mod
-mock_poms.ModificationsDB.return_value = mock_mod_db
-sys.modules["pyopenms"] = mock_poms
-
 from src.peptide_calculator import (
     detect_modification_from_sequence,
     _match_mass_delta_to_modification,
@@ -42,107 +31,65 @@ class TestModificationDetection:
         modification = detect_modification_from_sequence("SIMPLESEQUENCE")
         assert modification == "None"
 
-    def test_detect_modification_oxidation(self):
-        """Test detection of oxidation modification."""
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.return_value = ("MPEPTIDE", "M(Oxidation)PEPTIDE")
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_detect_modification_oxidation(self, mock_parse):
+        mock_parse.return_value = ("MPEPTIDE", "M(Oxidation)PEPTIDE")
+        modification = detect_modification_from_sequence("M[Oxidation]PEPTIDE")
+        assert modification == "Oxidation (M)"
 
-            modification = detect_modification_from_sequence("M[Oxidation]PEPTIDE")
-            assert modification == "Oxidation (M)"
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_detect_modification_carbamidomethyl(self, mock_parse):
+        mock_parse.return_value = ("CPEPTIDE", "C(Carbamidomethyl)PEPTIDE")
+        modification = detect_modification_from_sequence("C[Carbamidomethyl]PEPTIDE")
+        assert modification == "Carbamidomethyl (C)"
 
-    def test_detect_modification_carbamidomethyl(self):
-        """Test detection of carbamidomethyl modification."""
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.return_value = ("CPEPTIDE", "C(Carbamidomethyl)PEPTIDE")
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_detect_modification_phosphorylation(self, mock_parse):
+        mock_parse.return_value = ("SPEPTIDE", "S(Phospho)PEPTIDE")
+        modification = detect_modification_from_sequence("S[Phospho]PEPTIDE")
+        assert modification == "Phosphorylation (S/T/Y)"
 
-            modification = detect_modification_from_sequence(
-                "C[Carbamidomethyl]PEPTIDE"
-            )
-            assert modification == "Carbamidomethyl (C)"
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_detect_modification_n_terminal_acetylation(self, mock_parse):
+        mock_parse.return_value = ("PEPTIDE", ".(Acetyl)PEPTIDE")
+        modification = detect_modification_from_sequence("[Acetyl]PEPTIDE")
+        assert modification == "Acetylation (N-term)"
 
-    def test_detect_modification_phosphorylation(self):
-        """Test detection of phosphorylation modification."""
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.return_value = ("SPEPTIDE", "S(Phospho)PEPTIDE")
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_detect_modification_methylation(self, mock_parse):
+        mock_parse.return_value = ("KPEPTIDE", "K(Methyl)PEPTIDE")
+        modification = detect_modification_from_sequence("K[Methyl]PEPTIDE")
+        assert modification == "Methylation (K/R)"
 
-            modification = detect_modification_from_sequence("S[Phospho]PEPTIDE")
-            assert modification == "Phosphorylation (S/T/Y)"
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_detect_modification_deamidation(self, mock_parse):
+        mock_parse.return_value = ("NPEPTIDE", "N(Deamidated)PEPTIDE")
+        modification = detect_modification_from_sequence("N[Deamidated]PEPTIDE")
+        assert modification == "Deamidation (N/Q)"
 
-    def test_detect_modification_n_terminal_acetylation(self):
-        """Test detection of N-terminal acetylation."""
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.return_value = ("PEPTIDE", ".(Acetyl)PEPTIDE")
+    @patch("src.peptide_calculator._match_mass_delta_to_modification")
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_detect_modification_mass_delta(self, mock_parse, mock_match):
+        mock_parse.return_value = ("MPEPTIDE", "M[+15.9949]PEPTIDE")
+        mock_match.return_value = "Oxidation (M)"
+        modification = detect_modification_from_sequence("M[+15.9949]PEPTIDE")
+        assert modification == "Oxidation (M)"
 
-            modification = detect_modification_from_sequence("[Acetyl]PEPTIDE")
-            assert modification == "Acetylation (N-term)"
+    @patch("src.peptide_calculator._match_mass_delta_to_modification")
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_detect_modification_unknown_mass_delta(self, mock_parse, mock_match):
+        mock_parse.return_value = ("MPEPTIDE", "M[+999.999]PEPTIDE")
+        mock_match.return_value = "None"
+        modification = detect_modification_from_sequence("M[+999.999]PEPTIDE")
+        assert modification == "None"
 
-    def test_detect_modification_methylation(self):
-        """Test detection of methylation modification."""
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.return_value = ("KPEPTIDE", "K(Methyl)PEPTIDE")
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_detect_modification_parse_exception(self, mock_parse):
+        mock_parse.side_effect = Exception("Parse error")
+        modification = detect_modification_from_sequence("INVALID[Mod]SEQUENCE")
+        assert modification == "None"
 
-            modification = detect_modification_from_sequence("K[Methyl]PEPTIDE")
-            assert modification == "Methylation (K/R)"
-
-    def test_detect_modification_deamidation(self):
-        """Test detection of deamidation modification."""
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.return_value = ("NPEPTIDE", "N(Deamidated)PEPTIDE")
-
-            modification = detect_modification_from_sequence("N[Deamidated]PEPTIDE")
-            assert modification == "Deamidation (N/Q)"
-
-    def test_detect_modification_mass_delta(self):
-        """Test detection of modifications by mass delta."""
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.return_value = ("MPEPTIDE", "M[+15.9949]PEPTIDE")
-            with patch(
-                "src.peptide_calculator._match_mass_delta_to_modification"
-            ) as mock_match:
-                mock_match.return_value = "Oxidation (M)"
-
-                modification = detect_modification_from_sequence("M[+15.9949]PEPTIDE")
-                assert modification == "Oxidation (M)"
-
-    def test_detect_modification_unknown_mass_delta(self):
-        """Test detection with unknown mass delta."""
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.return_value = ("MPEPTIDE", "M[+999.999]PEPTIDE")
-            with patch(
-                "src.peptide_calculator._match_mass_delta_to_modification"
-            ) as mock_match:
-                mock_match.return_value = "None"
-
-                modification = detect_modification_from_sequence("M[+999.999]PEPTIDE")
-                assert modification == "None"
-
-    def test_detect_modification_parse_exception(self):
-        """Test exception handling in modification detection."""
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.side_effect = Exception("Parse error")
-
-            modification = detect_modification_from_sequence("INVALID[Mod]SEQUENCE")
-            assert modification == "None"
-
-    def test_match_mass_delta_known_modifications(self):
+    def test_match_mass_delta_known_modifications(self, mock_pyopenms):
         """Test mass delta matching for known modifications."""
         result = _match_mass_delta_to_modification(57.021464)
         assert result == "Carbamidomethyl (C)"
@@ -162,7 +109,7 @@ class TestModificationDetection:
         result = _match_mass_delta_to_modification(0.984016)
         assert result == "Deamidation (N/Q)"
 
-    def test_match_mass_delta_tolerance(self):
+    def test_match_mass_delta_tolerance(self, mock_pyopenms):
         """Test mass delta matching with tolerance."""
         result = _match_mass_delta_to_modification(57.022, tolerance=0.01)
         assert result == "Carbamidomethyl (C)"
@@ -174,7 +121,7 @@ class TestModificationDetection:
         result = _match_mass_delta_to_modification(57.025, tolerance=0.01)
         assert result == "Carbamidomethyl (C)"
 
-    def test_match_mass_delta_unknown_mass(self):
+    def test_match_mass_delta_unknown_mass(self, mock_pyopenms):
         """Test mass delta matching for unknown modifications."""
         result = _match_mass_delta_to_modification(999.999)
         assert result == "None"
@@ -185,14 +132,11 @@ class TestModificationDetection:
         result = _match_mass_delta_to_modification(0.001)
         assert result == "None"
 
-    def test_match_mass_delta_with_moddb_fallback(self):
+    def test_match_mass_delta_with_moddb_fallback(self, mock_pyopenms):
         """Test mass delta matching with ModificationsDB fallback."""
-        with patch("src.peptide_calculator._get_pyopenms_mod_db") as mock_get_db:
-            mock_get_db.return_value = mock_mod_db
-
-            # Close to oxidation mass - should either match known mass or fall back to ModDB
-            result = _match_mass_delta_to_modification(15.99)
-            assert result in ["Oxidation (M)", "None"]
+        # Close to oxidation mass - should either match known mass or fall back to ModDB
+        result = _match_mass_delta_to_modification(15.99)
+        assert result in ["Oxidation (M)", "None"]
 
 
 class TestModificationApplication:
@@ -266,10 +210,6 @@ class TestModificationApplication:
         result = apply_modification("PEPTIDE", "")
         assert result == "PEPTIDE"
 
-
-class TestModificationUtilities:
-    """Test cases for modification utility functions."""
-
     def test_get_supported_modifications(self):
         """Test getting supported modifications list."""
         modifications = get_supported_modifications()
@@ -284,24 +224,19 @@ class TestModificationUtilities:
         assert "Deamidation (N/Q)" in modifications
         assert len(modifications) == 7  # Expected number of modifications
 
-    def test_get_modification_info(self):
+    def test_get_modification_info(self, mock_pyopenms):
         """Test getting detailed modification information."""
-        with patch("src.peptide_calculator._get_pyopenms") as mock_get_poms:
-            mock_get_poms.return_value = mock_poms
-            with patch("src.peptide_calculator._get_pyopenms_mod_db") as mock_get_db:
-                mock_get_db.return_value = mock_mod_db
+        mod_info = get_modification_info()
 
-                mod_info = get_modification_info()
+        assert isinstance(mod_info, dict)
+        assert "None" in mod_info
+        assert mod_info["None"] == "No modification applied"
 
-                assert isinstance(mod_info, dict)
-                assert "None" in mod_info
-                assert mod_info["None"] == "No modification applied"
-
-                for mod_name, description in mod_info.items():
-                    assert isinstance(mod_name, str)
-                    assert isinstance(description, str)
-                    if mod_name != "None":
-                        assert len(description) > 0
+        for mod_name, description in mod_info.items():
+            assert isinstance(mod_name, str)
+            assert isinstance(description, str)
+            if mod_name != "None":
+                assert len(description) > 0
 
     def test_get_square_bracket_examples(self):
         """Test getting square bracket examples."""
