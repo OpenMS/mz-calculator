@@ -10,19 +10,6 @@ from unittest.mock import patch, MagicMock
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
-# Mock pyopenms before importing to avoid dependency issues in test environment
-mock_poms = MagicMock()
-mock_poms.__version__ = "2.9.1"
-
-# Mock AASequence with realistic behavior for testing
-mock_aa_seq = MagicMock()
-mock_aa_seq.getMZ.return_value = 500.25
-mock_aa_seq.getMonoWeight.return_value = 999.49
-mock_aa_seq.getFormula.return_value.toString.return_value = "C43H66N12O12"
-mock_poms.AASequence.fromString.return_value = mock_aa_seq
-
-sys.modules["pyopenms"] = mock_poms
-
 from src.peptide_calculator import (
     analyze_peptide_sequence,
     parse_proforma_sequence,
@@ -51,147 +38,110 @@ class TestAnalyzePeptideSequence:
         assert analysis.is_valid is False
         assert analysis.error_message == ERROR_MESSAGES["empty_sequence"]
 
-    def test_analyze_basic_valid_sequence(self):
-        with patch(
-            "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-        ) as mock_parse:
-            with patch(
-                "src.peptide_calculator.detect_modification_from_sequence"
-            ) as mock_detect:
-                with patch(
-                    "src.peptide_calculator.validate_peptide_sequence"
-                ) as mock_validate:
-                    mock_parse.return_value = ("PEPTIDE", "PEPTIDE", 1)
-                    mock_detect.return_value = "None"
-                    mock_validate.return_value = (True, "PEPTIDE")
+    @patch("src.peptide_calculator.validate_peptide_sequence")
+    @patch("src.peptide_calculator.detect_modification_from_sequence")
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
+    def test_analyze_basic_valid_sequence(self, mock_parse, mock_detect, mock_validate):
+        mock_parse.return_value = ("PEPTIDE", "PEPTIDE", 1)
+        mock_detect.return_value = "None"
+        mock_validate.return_value = (True, "PEPTIDE")
 
-                    analysis = analyze_peptide_sequence("PEPTIDE")
+        analysis = analyze_peptide_sequence("PEPTIDE")
 
-                    assert analysis.is_valid is True
-                    assert analysis.error_message is None
-                    assert analysis.modification == "None"
-                    assert analysis.modification_detected is False
-                    assert analysis.charge == 2  # Default charge
-                    assert analysis.charge_detected is False
-                    assert analysis.clean_sequence == "PEPTIDE"
+        assert analysis.is_valid is True
+        assert analysis.error_message is None
+        assert analysis.modification == "None"
+        assert analysis.modification_detected is False
+        assert analysis.charge == 2  # Default charge
+        assert analysis.charge_detected is False
+        assert analysis.clean_sequence == "PEPTIDE"
 
-    def test_analyze_sequence_with_charge_detection(self):
-        with patch(
-            "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-        ) as mock_parse:
-            with patch(
-                "src.peptide_calculator.detect_modification_from_sequence"
-            ) as mock_detect:
-                with patch(
-                    "src.peptide_calculator.validate_peptide_sequence"
-                ) as mock_validate:
-                    mock_parse.return_value = ("PEPTIDE", "PEPTIDE", 3)
-                    mock_detect.return_value = "None"
-                    mock_validate.return_value = (True, "PEPTIDE")
+    @patch("src.peptide_calculator.validate_peptide_sequence")
+    @patch("src.peptide_calculator.detect_modification_from_sequence")
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
+    def test_analyze_sequence_with_charge_detection(
+        self, mock_parse, mock_detect, mock_validate
+    ):
+        mock_parse.return_value = ("PEPTIDE", "PEPTIDE", 3)
+        mock_detect.return_value = "None"
+        mock_validate.return_value = (True, "PEPTIDE")
 
-                    analysis = analyze_peptide_sequence("PEPTIDE/3")
+        analysis = analyze_peptide_sequence("PEPTIDE/3")
 
-                    assert analysis.is_valid is True
-                    assert analysis.charge == 3
-                    assert analysis.charge_detected is True
+        assert analysis.is_valid is True
+        assert analysis.charge == 3
+        assert analysis.charge_detected is True
 
-    def test_analyze_sequence_with_modification_detection(self):
-        with patch(
-            "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-        ) as mock_parse:
-            with patch(
-                "src.peptide_calculator.detect_modification_from_sequence"
-            ) as mock_detect:
-                with patch(
-                    "src.peptide_calculator.validate_peptide_sequence"
-                ) as mock_validate:
-                    mock_parse.return_value = ("MPEPTIDE", "M(Oxidation)PEPTIDE", 1)
-                    mock_detect.return_value = "Oxidation (M)"
-                    mock_validate.return_value = (True, "MPEPTIDE")
+    @patch("src.peptide_calculator.validate_peptide_sequence")
+    @patch("src.peptide_calculator.detect_modification_from_sequence")
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
+    def test_analyze_sequence_with_modification_detection(
+        self, mock_parse, mock_detect, mock_validate
+    ):
+        mock_parse.return_value = ("MPEPTIDE", "M(Oxidation)PEPTIDE", 1)
+        mock_detect.return_value = "Oxidation (M)"
+        mock_validate.return_value = (True, "MPEPTIDE")
 
-                    analysis = analyze_peptide_sequence("M[Oxidation]PEPTIDE")
+        analysis = analyze_peptide_sequence("M[Oxidation]PEPTIDE")
 
-                    assert analysis.is_valid is True
-                    assert analysis.modification == "Oxidation (M)"
-                    assert analysis.modification_detected is True
+        assert analysis.is_valid is True
+        assert analysis.modification == "Oxidation (M)"
+        assert analysis.modification_detected is True
 
-    def test_analyze_sequence_with_both_charge_and_modification(self):
-        with patch(
-            "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-        ) as mock_parse:
-            with patch(
-                "src.peptide_calculator.detect_modification_from_sequence"
-            ) as mock_detect:
-                with patch(
-                    "src.peptide_calculator.validate_peptide_sequence"
-                ) as mock_validate:
-                    mock_parse.return_value = ("MPEPTIDE", "M(Oxidation)PEPTIDE", 2)
-                    mock_detect.return_value = "Oxidation (M)"
-                    mock_validate.return_value = (True, "MPEPTIDE")
+    @patch("src.peptide_calculator.validate_peptide_sequence")
+    @patch("src.peptide_calculator.detect_modification_from_sequence")
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
+    def test_analyze_sequence_with_both_charge_and_modification(
+        self, mock_parse, mock_detect, mock_validate
+    ):
+        mock_parse.return_value = ("MPEPTIDE", "M(Oxidation)PEPTIDE", 2)
+        mock_detect.return_value = "Oxidation (M)"
+        mock_validate.return_value = (True, "MPEPTIDE")
 
-                    analysis = analyze_peptide_sequence("M[Oxidation]PEPTIDE/2")
+        analysis = analyze_peptide_sequence("M[Oxidation]PEPTIDE/2")
 
-                    assert analysis.is_valid is True
-                    assert analysis.modification == "Oxidation (M)"
-                    assert analysis.modification_detected is True
-                    assert analysis.charge == 2
-                    assert analysis.charge_detected is True
+        assert analysis.is_valid is True
+        assert analysis.modification == "Oxidation (M)"
+        assert analysis.modification_detected is True
+        assert analysis.charge == 2
+        assert analysis.charge_detected is True
 
-    def test_analyze_invalid_sequence(self):
-        with patch(
-            "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-        ) as mock_parse:
-            with patch(
-                "src.peptide_calculator.detect_modification_from_sequence"
-            ) as mock_detect:
-                with patch(
-                    "src.peptide_calculator.validate_peptide_sequence"
-                ) as mock_validate:
-                    mock_parse.return_value = ("PEPTIDEZ", "PEPTIDEZ", 1)
-                    mock_detect.return_value = "None"
-                    mock_validate.return_value = (False, "PEPTIDEZ")
+    @patch("src.peptide_calculator.validate_peptide_sequence")
+    @patch("src.peptide_calculator.detect_modification_from_sequence")
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
+    def test_analyze_invalid_sequence(self, mock_parse, mock_detect, mock_validate):
+        mock_parse.return_value = ("PEPTIDEZ", "PEPTIDEZ", 1)
+        mock_detect.return_value = "None"
+        mock_validate.return_value = (False, "PEPTIDEZ")
 
-                    analysis = analyze_peptide_sequence("PEPTIDEZ")
+        analysis = analyze_peptide_sequence("PEPTIDEZ")
 
-                    assert analysis.is_valid is False
-                    assert (
-                        analysis.error_message == ERROR_MESSAGES["invalid_amino_acid"]
-                    )
+        assert analysis.is_valid is False
+        assert analysis.error_message == ERROR_MESSAGES["invalid_amino_acid"]
 
-    def test_analyze_empty_clean_sequence(self):
+    @patch("src.peptide_calculator.validate_peptide_sequence")
+    @patch("src.peptide_calculator.detect_modification_from_sequence")
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
+    def test_analyze_empty_clean_sequence(self, mock_parse, mock_detect, mock_validate):
         """Test analysis when clean sequence is empty after parsing modifications."""
-        with patch(
-            "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-        ) as mock_parse:
-            with patch(
-                "src.peptide_calculator.detect_modification_from_sequence"
-            ) as mock_detect:
-                with patch(
-                    "src.peptide_calculator.validate_peptide_sequence"
-                ) as mock_validate:
-                    mock_parse.return_value = ("", "", 1)
-                    mock_detect.return_value = "None"
-                    mock_validate.return_value = (True, "")
+        mock_parse.return_value = ("", "", 1)
+        mock_detect.return_value = "None"
+        mock_validate.return_value = (True, "")
 
-                    analysis = analyze_peptide_sequence("[Acetyl]")
+        analysis = analyze_peptide_sequence("[Acetyl]")
 
-                    assert analysis.is_valid is False
-                    assert (
-                        analysis.error_message
-                        == ERROR_MESSAGES["invalid_sequence_length"]
-                    )
+        assert analysis.is_valid is False
+        assert analysis.error_message == ERROR_MESSAGES["invalid_sequence_length"]
 
-    def test_analyze_sequence_exception_handling(self):
-        with patch(
-            "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-        ) as mock_parse:
-            mock_parse.side_effect = Exception("Parse error")
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
+    def test_analyze_sequence_exception_handling(self, mock_parse):
+        mock_parse.side_effect = Exception("Parse error")
 
-            analysis = analyze_peptide_sequence("INVALID")
+        analysis = analyze_peptide_sequence("INVALID")
 
-            assert analysis.is_valid is False
-            assert analysis.error_message is not None
-            assert "unexpected error" in analysis.error_message.lower()
+        assert analysis.is_valid is False
+        assert analysis.error_message is not None
+        assert "unexpected error" in analysis.error_message.lower()
 
     def test_analyze_sequence_defaults(self):
         analysis = SequenceAnalysis()
@@ -208,87 +158,69 @@ class TestAnalyzePeptideSequence:
 class TestParseProFormaSequence:
     """Test cases for ProForma sequence parsing."""
 
-    def test_parse_proforma_direct_success(self):
-        with patch("src.peptide_calculator._get_pyopenms") as mock_get_poms:
-            mock_get_poms.return_value = mock_poms
+    def test_parse_proforma_direct_success(self, mock_pyopenms):
+        clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
+            "PEPTIDE[+42.0106]"
+        )
 
-            clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
-                "PEPTIDE[+42.0106]"
-            )
+        assert clean_seq == "PEPTIDE"
+        assert converted_seq == "PEPTIDE[+42.0106]"
+        assert proforma_direct is True
 
-            assert clean_seq == "PEPTIDE"
-            assert converted_seq == "PEPTIDE[+42.0106]"
-            assert proforma_direct is True
-
-    def test_parse_proforma_with_leading_dot(self):
+    def test_parse_proforma_with_leading_dot(self, mock_pyopenms):
         """Test ProForma parsing with leading dot (common in mass spec notation)."""
-        with patch("src.peptide_calculator._get_pyopenms") as mock_get_poms:
-            mock_get_poms.return_value = mock_poms
+        clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
+            ".PEPTIDE[+42.0106]"
+        )
 
-            clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
-                ".PEPTIDE[+42.0106]"
-            )
+        assert clean_seq == "PEPTIDE"
+        assert converted_seq == "PEPTIDE[+42.0106]"
+        assert proforma_direct is True
 
-            assert clean_seq == "PEPTIDE"
-            assert converted_seq == "PEPTIDE[+42.0106]"
-            assert proforma_direct is True
-
-    def test_parse_proforma_direct_failure_fallback(self):
+    def test_parse_proforma_direct_failure_fallback(self, mock_pyopenms):
         """Test fallback to traditional conversion when direct ProForma parsing fails."""
-        with patch("src.peptide_calculator._get_pyopenms") as mock_get_poms:
-            # Make direct parsing fail
-            mock_get_poms.return_value.AASequence.fromString.side_effect = Exception(
-                "Parse error"
-            )
+        # Make direct parsing fail
+        mock_pyopenms.AASequence.fromString.side_effect = Exception("Parse error")
 
-            with patch(
-                "src.peptide_calculator.parse_square_bracket_modifications"
-            ) as mock_parse:
-                mock_parse.return_value = ("PEPTIDE", "PEPTIDE(Oxidation)")
-
-                clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
-                    "PEPTIDE[Oxidation]"
-                )
-
-                assert clean_seq == "PEPTIDE"
-                assert converted_seq == "PEPTIDE(Oxidation)"
-                assert proforma_direct is False
-
-    def test_parse_proforma_complex_mass_deltas(self):
-        with patch("src.peptide_calculator._get_pyopenms") as mock_get_poms:
-            mock_get_poms.return_value = mock_poms
+        with patch(
+            "src.peptide_calculator.parse_square_bracket_modifications"
+        ) as mock_parse:
+            mock_parse.return_value = ("PEPTIDE", "PEPTIDE(Oxidation)")
 
             clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
-                "EM[+15.9949]EVEES[-79.9663]PEK"
-            )
-
-            assert clean_seq == "EMEVEESPEK"
-            assert converted_seq == "EM[+15.9949]EVEES[-79.9663]PEK"
-            assert proforma_direct is True
-
-    def test_parse_proforma_scientific_notation(self):
-        with patch("src.peptide_calculator._get_pyopenms") as mock_get_poms:
-            mock_get_poms.return_value = mock_poms
-
-            clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
-                "PEPTIDE[+1.5e2]"
+                "PEPTIDE[Oxidation]"
             )
 
             assert clean_seq == "PEPTIDE"
-            assert converted_seq == "PEPTIDE[+1.5e2]"
-            assert proforma_direct is True
+            assert converted_seq == "PEPTIDE(Oxidation)"
+            assert proforma_direct is False
 
-    def test_parse_proforma_multiple_modifications(self):
-        with patch("src.peptide_calculator._get_pyopenms") as mock_get_poms:
-            mock_get_poms.return_value = mock_poms
+    def test_parse_proforma_complex_mass_deltas(self, mock_pyopenms):
+        clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
+            "EM[+15.9949]EVEES[-79.9663]PEK"
+        )
 
-            clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
-                "K[+28.0313]PEPTIDER[-10.0086]"
-            )
+        assert clean_seq == "EMEVEESPEK"
+        assert converted_seq == "EM[+15.9949]EVEES[-79.9663]PEK"
+        assert proforma_direct is True
 
-            assert clean_seq == "KPEPTIDER"
-            assert converted_seq == "K[+28.0313]PEPTIDER[-10.0086]"
-            assert proforma_direct is True
+    def test_parse_proforma_scientific_notation(self, mock_pyopenms):
+        clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
+            "PEPTIDE[+1.5e2]"
+        )
+
+        assert clean_seq == "PEPTIDE"
+        assert converted_seq == "PEPTIDE[+1.5e2]"
+        assert proforma_direct is True
+
+    def test_parse_proforma_multiple_modifications(self, mock_pyopenms):
+        clean_seq, converted_seq, proforma_direct = parse_proforma_sequence(
+            "K[+28.0313]PEPTIDER[-10.0086]"
+        )
+
+        assert clean_seq == "KPEPTIDER"
+        assert converted_seq == "K[+28.0313]PEPTIDER[-10.0086]"
+        assert proforma_direct is True
 
 
 class TestCachingFunctions:
