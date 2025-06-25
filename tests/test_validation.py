@@ -57,29 +57,25 @@ class TestValidationFunctions:
             ("PEPTIDE[Amidated]", "PEPTIDE"),
         ],
     )
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
     def test_validate_peptide_sequence_with_modifications(
-        self, sequence, expected_clean
+        self, mock_parse, sequence, expected_clean
     ):
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.return_value = (expected_clean, f"Modified_{expected_clean}")
+        mock_parse.return_value = (expected_clean, f"Modified_{expected_clean}")
 
-            is_valid, clean_seq = validate_peptide_sequence(sequence)
-            assert is_valid is True
-            assert clean_seq == expected_clean
-            mock_parse.assert_called_once_with(sequence)
+        is_valid, clean_seq = validate_peptide_sequence(sequence)
+        assert is_valid is True
+        assert clean_seq == expected_clean
+        mock_parse.assert_called_once_with(sequence)
 
-    def test_validate_peptide_sequence_with_leading_dot(self):
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_validate_peptide_sequence_with_leading_dot(self, mock_parse):
         # Test validation with leading dot for N-terminal modifications
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.return_value = ("PEPTIDE", ".(Acetyl)PEPTIDE")
+        mock_parse.return_value = ("PEPTIDE", ".(Acetyl)PEPTIDE")
 
-            is_valid, clean_seq = validate_peptide_sequence(".[Acetyl]PEPTIDE")
-            assert is_valid is True
-            assert clean_seq == "PEPTIDE"
+        is_valid, clean_seq = validate_peptide_sequence(".[Acetyl]PEPTIDE")
+        assert is_valid is True
+        assert clean_seq == "PEPTIDE"
 
     @pytest.mark.parametrize(
         "sequence",
@@ -95,17 +91,15 @@ class TestValidationFunctions:
         assert isinstance(is_valid, bool)
         assert isinstance(clean_seq, str)
 
-    def test_validate_peptide_sequence_parse_exception(self):
+    @patch("src.peptide_calculator.parse_square_bracket_modifications")
+    def test_validate_peptide_sequence_parse_exception(self, mock_parse):
         # Test fallback behavior when parsing fails
-        with patch(
-            "src.peptide_calculator.parse_square_bracket_modifications"
-        ) as mock_parse:
-            mock_parse.side_effect = Exception("Parse error")
+        mock_parse.side_effect = Exception("Parse error")
 
-            # Test with a simple valid sequence to ensure fallback works
-            is_valid, clean_seq = validate_peptide_sequence("PEPTIDE")
-            assert isinstance(is_valid, bool)
-            assert isinstance(clean_seq, str)
+        # Test with a simple valid sequence to ensure fallback works
+        is_valid, clean_seq = validate_peptide_sequence("PEPTIDE")
+        assert isinstance(is_valid, bool)
+        assert isinstance(clean_seq, str)
 
     def test_validate_peptide_sequence_fallback_validation(self):
         # Test that fallback validation works correctly without mocking
@@ -123,21 +117,19 @@ class TestValidationFunctions:
             ("SEQUENCE3", "SEQUENCE", 3),
         ],
     )
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
     def test_validate_peptide_sequence_with_mods_valid(
-        self, sequence, expected_clean, expected_charge
+        self, mock_parse, sequence, expected_clean, expected_charge
     ):
-        with patch(
-            "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-        ) as mock_parse:
-            mock_parse.return_value = (expected_clean, expected_clean, expected_charge)
+        mock_parse.return_value = (expected_clean, expected_clean, expected_charge)
 
-            is_valid, clean_seq, openms_seq, charge = (
-                validate_peptide_sequence_with_mods(sequence)
-            )
-            assert is_valid is True
-            assert clean_seq == expected_clean
-            assert charge == expected_charge
-            mock_parse.assert_called_once_with(sequence)
+        is_valid, clean_seq, openms_seq, charge = validate_peptide_sequence_with_mods(
+            sequence
+        )
+        assert is_valid is True
+        assert clean_seq == expected_clean
+        assert charge == expected_charge
+        mock_parse.assert_called_once_with(sequence)
 
     @pytest.mark.parametrize(
         "invalid_sequence,expected_clean",
@@ -147,33 +139,29 @@ class TestValidationFunctions:
             ("INVALIDZ123", "INVALIDZ"),
         ],
     )
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
     def test_validate_peptide_sequence_with_mods_invalid(
-        self, invalid_sequence, expected_clean
+        self, mock_parse, invalid_sequence, expected_clean
     ):
-        with patch(
-            "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-        ) as mock_parse:
-            mock_parse.return_value = (expected_clean, invalid_sequence, 1)
+        mock_parse.return_value = (expected_clean, invalid_sequence, 1)
 
-            is_valid, clean_seq, openms_seq, charge = (
-                validate_peptide_sequence_with_mods(invalid_sequence)
-            )
-            # Should detect that the clean sequence contains invalid amino acids
-            assert is_valid is False
+        is_valid, clean_seq, openms_seq, charge = validate_peptide_sequence_with_mods(
+            invalid_sequence
+        )
+        # Should detect that the clean sequence contains invalid amino acids
+        assert is_valid is False
 
-    def test_validate_peptide_sequence_with_mods_exception_handling(self):
-        with patch(
-            "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-        ) as mock_parse:
-            mock_parse.side_effect = Exception("Parse error")
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
+    def test_validate_peptide_sequence_with_mods_exception_handling(self, mock_parse):
+        mock_parse.side_effect = Exception("Parse error")
 
-            is_valid, clean_seq, openms_seq, charge = (
-                validate_peptide_sequence_with_mods("INVALID")
-            )
-            assert is_valid is False
-            assert clean_seq == ""
-            assert openms_seq == ""
-            assert charge == 1
+        is_valid, clean_seq, openms_seq, charge = validate_peptide_sequence_with_mods(
+            "INVALID"
+        )
+        assert is_valid is False
+        assert clean_seq == ""
+        assert openms_seq == ""
+        assert charge == 1
 
     def test_validate_very_long_sequence(self):
         long_sequence = "A" * 1000
@@ -207,7 +195,8 @@ class TestValidationFunctions:
         assert isinstance(is_valid, bool)
         assert isinstance(clean_seq, str)
 
-    def test_validate_peptide_sequence_with_complex_modifications(self):
+    @patch("src.peptide_calculator.parse_sequence_with_mods_and_charge")
+    def test_validate_peptide_sequence_with_complex_modifications(self, mock_parse):
         # Test validation with complex modification patterns
         complex_sequences = [
             ".[Acetyl]M[Oxidation]PEPTIDEC[Carbamidomethyl]/2",
@@ -215,19 +204,15 @@ class TestValidationFunctions:
             "ALSSC[UNIMOD:4]VVDEEQDVER/2",
         ]
 
+        mock_parse.return_value = ("PEPTIDE", "PEPTIDE", 2)
         for sequence in complex_sequences:
-            with patch(
-                "src.peptide_calculator.parse_sequence_with_mods_and_charge"
-            ) as mock_parse:
-                mock_parse.return_value = ("PEPTIDE", "PEPTIDE", 2)
-
-                is_valid, clean_seq, openms_seq, charge = (
-                    validate_peptide_sequence_with_mods(sequence)
-                )
-                assert isinstance(is_valid, bool)
-                assert isinstance(clean_seq, str)
-                assert isinstance(openms_seq, str)
-                assert isinstance(charge, int)
+            is_valid, clean_seq, openms_seq, charge = (
+                validate_peptide_sequence_with_mods(sequence)
+            )
+            assert isinstance(is_valid, bool)
+            assert isinstance(clean_seq, str)
+            assert isinstance(openms_seq, str)
+            assert isinstance(charge, int)
 
     def test_validate_peptide_sequence_error_messages(self):
         # Test that appropriate error context is maintained
