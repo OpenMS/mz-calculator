@@ -9,6 +9,7 @@ from typing import Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 import re
 
+
 def _get_pyopenms():
     """Lazy import of pyOpenMS to avoid loading issues.
 
@@ -17,9 +18,12 @@ def _get_pyopenms():
 
     """
     import pyopenms as poms
+
     return poms
 
+
 _mod_db_cache = None
+
 
 def _get_pyopenms_mod_db():
     """Lazy import and cached initialization of pyOpenMS ModificationsDB.
@@ -34,18 +38,20 @@ def _get_pyopenms_mod_db():
         _mod_db_cache = poms.ModificationsDB()
     return _mod_db_cache
 
+
 ERROR_MESSAGES = {
-    'empty_sequence': "Please enter a peptide sequence.",
-    'invalid_amino_acid': "Invalid amino acid sequence. Please use only standard amino acid codes (A, C, D, E, F, G, H, I, K, L, M, N, P, Q, R, S, T, V, W, Y, X, U).",
-    'invalid_sequence_length': "Please enter a valid peptide sequence.",
-    'calculation_error': "Error during calculation: {error}",
-    'unexpected_error': "An unexpected error occurred: {error}"
+    "empty_sequence": "Please enter a peptide sequence.",
+    "invalid_amino_acid": "Invalid amino acid sequence. Please use only standard amino acid codes (A, C, D, E, F, G, H, I, K, L, M, N, P, Q, R, S, T, V, W, Y, X, U).",
+    "invalid_sequence_length": "Please enter a valid peptide sequence.",
+    "calculation_error": "Error during calculation: {error}",
+    "unexpected_error": "An unexpected error occurred: {error}",
 }
 
 
 @dataclass
 class SequenceAnalysis:
     """Data class for sequence analysis results"""
+
     modification: str = "None"
     modification_detected: bool = False
     charge: int = 2
@@ -71,10 +77,10 @@ def parse_square_bracket_modifications(sequence: str) -> Tuple[str, str]:
     mod_db = _get_pyopenms_mod_db()
 
     sequence = sequence.strip()
-    
-    if sequence.startswith('.'):
+
+    if sequence.startswith("."):
         sequence = sequence[1:]
-    
+
     def convert_modification(mod_text):
         """Convert modification text to OpenMS format using ModificationsDB.
 
@@ -86,79 +92,82 @@ def parse_square_bracket_modifications(sequence: str) -> Tuple[str, str]:
 
         """
         mod_text = mod_text.strip()
-        
+
         # Check if it's a numeric mass delta (ProForma arbitrary mass shift)
-        mass_delta_pattern = r'^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$'
+        mass_delta_pattern = r"^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$"
         if re.match(mass_delta_pattern, mod_text):
-            if not mod_text.startswith(('+', '-')):
-                mod_text = '+' + mod_text
-            return f"[{mod_text}]"  
-        
+            if not mod_text.startswith(("+", "-")):
+                mod_text = "+" + mod_text
+            return f"[{mod_text}]"
+
         # Try to find modification by UNIMOD accession
         if mod_text.upper().startswith("UNIMOD:"):
             mod_accession = mod_text.upper()
             try:
                 mod = mod_db.getModification(mod_accession)
-                return mod.getId() 
+                return mod.getId()
             except Exception:
-                unimod_parts = mod_text.split(':')
-                if len(unimod_parts) == 2 and unimod_parts[1].replace('.', '', 1).isdigit():
+                unimod_parts = mod_text.split(":")
+                if (
+                    len(unimod_parts) == 2
+                    and unimod_parts[1].replace(".", "", 1).isdigit()
+                ):
                     mass_delta = float(unimod_parts[1])
                     return f"[{'+' if mass_delta >= 0 else ''}{mass_delta}]"
-                return mod_text 
-        
+                return mod_text
+
         try:
             mod = mod_db.getModification(mod_text)
-            return mod.getId() 
+            return mod.getId()
         except Exception:
-            pass 
-        
+            pass
+
         return mod_text
-    
+
     # Handle N-terminal modifications: [Acetyl]PEPTIDE or .[Acetyl]PEPTIDE
-    n_term_pattern = r'^\.?\[([^\]]+)\]'
+    n_term_pattern = r"^\.?\[([^\]]+)\]"
     n_term_match = re.search(n_term_pattern, sequence)
     n_term_mod = ""
     if n_term_match:
         mod_name = convert_modification(n_term_match.group(1))
-        if mod_name.startswith('[') and mod_name.endswith(']'):
+        if mod_name.startswith("[") and mod_name.endswith("]"):
             n_term_mod = f".{mod_name}"
         else:
             n_term_mod = f".({mod_name})"
-        sequence = re.sub(n_term_pattern, '', sequence)
-    
-    c_term_pattern = r'\.\[([^\]]+)\]$'
+        sequence = re.sub(n_term_pattern, "", sequence)
+
+    c_term_pattern = r"\.\[([^\]]+)\]$"
     c_term_match = re.search(c_term_pattern, sequence)
     c_term_mod = ""
     if c_term_match:
         mod_name = convert_modification(c_term_match.group(1))
-        if mod_name.startswith('[') and mod_name.endswith(']'):
+        if mod_name.startswith("[") and mod_name.endswith("]"):
             c_term_mod = f"{mod_name}."
         else:
             c_term_mod = f"({mod_name})."
-        sequence = re.sub(c_term_pattern, '', sequence)
-    
-    aa_mod_pattern = r'([A-Z])\[([^\]]+)\]'
-    
-    clean_sequence = re.sub(aa_mod_pattern, r'\1', sequence)
-    
+        sequence = re.sub(c_term_pattern, "", sequence)
+
+    aa_mod_pattern = r"([A-Z])\[([^\]]+)\]"
+
+    clean_sequence = re.sub(aa_mod_pattern, r"\1", sequence)
+
     def replace_aa_mod(match):
         aa = match.group(1)
         mod_text = match.group(2)
         converted_mod = convert_modification(mod_text)
-        
-        if converted_mod.startswith('[') and converted_mod.endswith(']'):
+
+        if converted_mod.startswith("[") and converted_mod.endswith("]"):
             return f"{aa}{converted_mod}"
         else:
             return f"{aa}({converted_mod})"
-    
+
     modified_sequence = re.sub(aa_mod_pattern, replace_aa_mod, sequence)
-    
+
     if n_term_mod:
         modified_sequence = n_term_mod + modified_sequence
     if c_term_mod:
         modified_sequence = modified_sequence + c_term_mod
-    
+
     return clean_sequence, modified_sequence
 
 
@@ -177,11 +186,13 @@ def validate_peptide_sequence_with_mods(sequence: str) -> Tuple[bool, str, str, 
 
     """
     try:
-        clean_sequence, openms_sequence, charge_state = parse_sequence_with_mods_and_charge(sequence)
-        
-        valid_aa = set('ACDEFGHIKLMNPQRSTVWYXU')  
+        clean_sequence, openms_sequence, charge_state = (
+            parse_sequence_with_mods_and_charge(sequence)
+        )
+
+        valid_aa = set("ACDEFGHIKLMNPQRSTVWYXU")
         is_valid = all(aa in valid_aa for aa in clean_sequence if aa.isalpha())
-        
+
         return is_valid, clean_sequence, openms_sequence, charge_state
     except Exception:
         return False, "", "", 1
@@ -199,26 +210,27 @@ def validate_peptide_sequence(sequence: str) -> tuple[bool, str]:
             clean_sequence is the sequence without modifications.
 
     """
+    import re
+
     try:
         clean_sequence, _ = parse_square_bracket_modifications(sequence)
-        
-        import re
-        clean_sequence = re.sub(r'\(([^\)]+)\)', '', clean_sequence)
-        
-        if clean_sequence.startswith('.'):
+
+        clean_sequence = re.sub(r"\(([^\)]+)\)", "", clean_sequence)
+
+        if clean_sequence.startswith("."):
             clean_sequence = clean_sequence[1:]
-            
-        valid_aa = set('ACDEFGHIKLMNPQRSTVWYXU')
+
+        valid_aa = set("ACDEFGHIKLMNPQRSTVWYXU")
         is_valid = all(aa in valid_aa for aa in clean_sequence if aa.isalpha())
         return is_valid, clean_sequence
     except Exception:
-        valid_aa = set('ACDEFGHIKLMNPQRSTVWYXU')
+        valid_aa = set("ACDEFGHIKLMNPQRSTVWYXU")
         sequence_clean = sequence.upper()
-        sequence_clean = re.sub(r'\[([^\]]+)\]', '', sequence_clean)
-        sequence_clean = re.sub(r'\(([^\)]+)\)', '', sequence_clean)
-        if sequence_clean.startswith('.'):
+        sequence_clean = re.sub(r"\[([^\]]+)\]", "", sequence_clean)
+        sequence_clean = re.sub(r"\(([^\)]+)\)", "", sequence_clean)
+        if sequence_clean.startswith("."):
             sequence_clean = sequence_clean[1:]
-        sequence_clean = ''.join(c for c in sequence_clean if c.isalpha())
+        sequence_clean = "".join(c for c in sequence_clean if c.isalpha())
         return all(aa in valid_aa for aa in sequence_clean), sequence_clean
 
 
@@ -243,7 +255,7 @@ def apply_modification(sequence: str, modification: str) -> str:
         "Phosphorylation (S/T/Y)": {"id": "Phospho", "aa": ["S", "T", "Y"]},
         "Acetylation (N-term)": {"id": "Acetyl", "terminal": "N"},
         "Methylation (K/R)": {"id": "Methyl", "aa": ["K", "R"]},
-        "Deamidation (N/Q)": {"id": "Deamidated", "aa": ["N", "Q"]}
+        "Deamidation (N/Q)": {"id": "Deamidated", "aa": ["N", "Q"]},
     }
 
     if modification in mod_mapping:
@@ -251,29 +263,33 @@ def apply_modification(sequence: str, modification: str) -> str:
         mod_id = mod_info["id"]
 
         if "aa" in mod_info:
-            target_aas = mod_info["aa"] if isinstance(mod_info["aa"], list) else [mod_info["aa"]]
+            target_aas = (
+                mod_info["aa"] if isinstance(mod_info["aa"], list) else [mod_info["aa"]]
+            )
             modified_sequence = sequence
             for aa in target_aas:
                 if aa in modified_sequence:
                     return modified_sequence.replace(aa, f"{aa}({mod_id})", 1)
             return sequence
-        
+
         elif "terminal" in mod_info:
             if mod_info["terminal"] == "N":
                 return f".({mod_id}){sequence}"
             elif mod_info["terminal"] == "C":
                 return f"{sequence}({mod_id})."
             return sequence
-    
+
     return sequence
 
 
-def calculate_peptide_mz(sequence: str, charge_state: int, modification: str = "None") -> Dict[str, Any]:
+def calculate_peptide_mz(
+    sequence: str, charge_state: int, modification: str = "None"
+) -> Dict[str, Any]:
     """Calculate the m/z ratio and related properties for a peptide.
 
     Args:
         sequence (str): The peptide sequence. Can contain modifications in square brackets
-                       and/or charge notation (e.g., "PEPTIDE/2", "M[Oxidation]PEPTIDE/3").
+                        and/or charge notation (e.g., "PEPTIDE/2", "M[Oxidation]PEPTIDE/3").
         charge_state (int): The charge state - will be overridden if charge notation is found.
         modification (str): Additional modification to apply from dropdown. Defaults to "None".
 
@@ -297,50 +313,58 @@ def calculate_peptide_mz(sequence: str, charge_state: int, modification: str = "
     """
     if not sequence.strip():
         raise ValueError("Peptide sequence cannot be empty")
-        
+
     if charge_state < 1:
         raise ValueError("Charge state must be a positive integer")
-    
+
     poms = _get_pyopenms()
-    
+
     sequence_no_charge, extracted_charge = parse_charge_notation(sequence)
-    
+
     # Try direct PyOpenMS parsing first for ProForma sequences
     proforma_direct = False
     clean_sequence = None
     openms_sequence = None
-    
+
     try:
         test_seq = poms.AASequence.fromString(sequence_no_charge)
-        import re
-        clean_sequence = re.sub(r'\[([^\]]+)\]', '', sequence_no_charge)
-        clean_sequence = re.sub(r'\(([^\)]+)\)', '', clean_sequence)
-        if clean_sequence.startswith('.'):
+
+        clean_sequence = re.sub(r"\[([^\]]+)\]", "", sequence_no_charge)
+        clean_sequence = re.sub(r"\(([^\)]+)\)", "", clean_sequence)
+        if clean_sequence.startswith("."):
             clean_sequence = clean_sequence[1:]
         openms_sequence = sequence_no_charge
         proforma_direct = True
     except Exception:
-        clean_sequence, openms_sequence, _ = parse_sequence_with_mods_and_charge(sequence)
+        clean_sequence, openms_sequence, _ = parse_sequence_with_mods_and_charge(
+            sequence
+        )
         proforma_direct = False
-    
+
     final_charge_state = extracted_charge if extracted_charge > 1 else charge_state
-    charge_source = "From sequence notation" if extracted_charge > 1 else "From input parameter"
-    
+    charge_source = (
+        "From sequence notation" if extracted_charge > 1 else "From input parameter"
+    )
+
     # Validate amino acids
-    valid_aa = set('ACDEFGHIKLMNPQRSTVWYXU')
+    valid_aa = set("ACDEFGHIKLMNPQRSTVWYXU")
     invalid_chars = [aa for aa in clean_sequence if aa.isalpha() and aa not in valid_aa]
     if invalid_chars:
-        invalid_list = ', '.join(sorted(set(invalid_chars)))
-        raise ValueError(f"Invalid amino acid(s) found in sequence: {invalid_list}. Valid amino acids are: A, C, D, E, F, G, H, I, K, L, M, N, P, Q, R, S, T, V, W, Y, X, U")
-    
+        invalid_list = ", ".join(sorted(set(invalid_chars)))
+        raise ValueError(
+            f"Invalid amino acid(s) found in sequence: {invalid_list}. Valid amino acids are: A, C, D, E, F, G, H, I, K, L, M, N, P, Q, R, S, T, V, W, Y, X, U"
+        )
+
     non_alpha_chars = [c for c in clean_sequence if not c.isalpha()]
     if non_alpha_chars:
-        non_alpha_list = ', '.join(sorted(set(non_alpha_chars)))
-        raise ValueError(f"Invalid character(s) found in sequence: {non_alpha_list}. Sequence should contain only amino acid letters. Did you mean to use charge notation (e.g., /2)?")
-    
+        non_alpha_list = ", ".join(sorted(set(non_alpha_chars)))
+        raise ValueError(
+            f"Invalid character(s) found in sequence: {non_alpha_list}. Sequence should contain only amino acid letters. Did you mean to use charge notation (e.g., /2)?"
+        )
+
     if not all(aa in valid_aa for aa in clean_sequence if aa.isalpha()):
         raise ValueError(f"Invalid amino acids found in sequence: {clean_sequence}")
-    
+
     # Handle modifications
     if proforma_direct:
         modified_sequence_str = openms_sequence
@@ -351,22 +375,24 @@ def calculate_peptide_mz(sequence: str, charge_state: int, modification: str = "
     else:
         modified_sequence_str = apply_modification(clean_sequence, modification)
         applied_modification = modification
-    
+
     try:
         aa_sequence_obj = poms.AASequence.fromString(modified_sequence_str)
     except Exception as e:
-        raise ValueError(f"Failed to parse modified sequence '{modified_sequence_str}': {str(e)}")
-    
+        raise ValueError(
+            f"Failed to parse modified sequence '{modified_sequence_str}': {str(e)}"
+        )
+
     mz_ratio = aa_sequence_obj.getMZ(final_charge_state)
     mono_weight = aa_sequence_obj.getMonoWeight()
     formula = aa_sequence_obj.getFormula()
-    
+
     # Calculate amino acid composition
     aa_composition = {}
     for aa_char in clean_sequence:
         if aa_char.isalpha():
             aa_composition[aa_char] = aa_composition.get(aa_char, 0) + 1
-    
+
     return {
         "mz_ratio": mz_ratio,
         "monoisotopic_mass": mono_weight,
@@ -378,7 +404,7 @@ def calculate_peptide_mz(sequence: str, charge_state: int, modification: str = "
         "modification": applied_modification,
         "sequence_length": len(clean_sequence),
         "aa_composition": aa_composition,
-        "success": True
+        "success": True,
     }
 
 
@@ -392,13 +418,13 @@ def get_supported_modifications() -> list:
     common_modifications = [
         "None",
         "Oxidation (M)",
-        "Carbamidomethyl (C)", 
+        "Carbamidomethyl (C)",
         "Phosphorylation (S/T/Y)",
         "Acetylation (N-term)",
         "Methylation (K/R)",
-        "Deamidation (N/Q)"
+        "Deamidation (N/Q)",
     ]
-    
+
     return common_modifications
 
 
@@ -407,15 +433,21 @@ def get_modification_info() -> Dict[str, str]:
 
     Returns:
         Dict[str, str]: A dictionary mapping modification names to their detailed descriptions
-                       including mass delta and target information.
+                        including mass delta and target information.
 
     """
     poms = _get_pyopenms()
     mod_db = _get_pyopenms_mod_db()
     info_dict = {"None": "No modification applied"}
-    
+
     common_mods_ids = [
-        "Oxidation", "Carbamidomethyl", "Phospho", "Acetyl", "Methyl", "Deamidated", "Amidated"
+        "Oxidation",
+        "Carbamidomethyl",
+        "Phospho",
+        "Acetyl",
+        "Methyl",
+        "Deamidated",
+        "Amidated",
     ]
 
     for mod_id in common_mods_ids:
@@ -423,7 +455,7 @@ def get_modification_info() -> Dict[str, str]:
             mod = mod_db.getModification(mod_id)
             full_name = mod.getFullName()
             diff_mono_mass = mod.getDiffMonoMass()
-            
+
             specificity = mod.getTermSpecificity()
             target_info_desc = ""
             if specificity == poms.ResidueModification.ANYWHERE:
@@ -438,10 +470,12 @@ def get_modification_info() -> Dict[str, str]:
                     if res.isalpha():
                         target_aas.append(res)
                 if target_aas:
-                    target_info_desc = f"on {', '.join(sorted(set(target_aas)))} residues"
+                    target_info_desc = (
+                        f"on {', '.join(sorted(set(target_aas)))} residues"
+                    )
 
             description = f"{full_name} ({target_info_desc}, {'+' if diff_mono_mass >= 0 else ''}{diff_mono_mass:.6f} Da)"
-            
+
             # Construct key name to match get_supported_modifications
             key_name_parts = [full_name]
             if specificity == poms.ResidueModification.N_TERM:
@@ -474,7 +508,7 @@ def get_square_bracket_examples() -> Dict[str, str]:
     """
     return {
         "M[Oxidation]PEPTIDE": "Methionine oxidation at position 1",
-        "PEPTIDEC[Carbamidomethyl]": "Carbamidomethylated cysteine at C-terminus", 
+        "PEPTIDEC[Carbamidomethyl]": "Carbamidomethylated cysteine at C-terminus",
         "[Acetyl]PEPTIDE": "N-terminal acetylation",
         "PEPTIDE[Amidated]": "C-terminal amidation",
         "PEPS[Phospho]TIDE": "Phosphorylated serine",
@@ -498,7 +532,7 @@ def get_square_bracket_examples() -> Dict[str, str]:
         "SEQUENCE[+0.9840]": "Small arbitrary mass shift",
         "LGEPDYIPSQQDILLAR[+42.0106]/2": "Arbitrary mass shift with charge notation",
         "PEPTIDE[+1.5e2]": "Scientific notation mass shift",
-        "SEQUENCE[-18.0106]": "Negative arbitrary mass shift (water loss)"
+        "SEQUENCE[-18.0106]": "Negative arbitrary mass shift (water loss)",
     }
 
 
@@ -535,32 +569,32 @@ def parse_charge_notation(sequence: str) -> Tuple[str, int]:
 
     """
     sequence = sequence.strip()
-    
+
     leading_dot = ""
-    if sequence.startswith('.'):
+    if sequence.startswith("."):
         leading_dot = "."
         sequence = sequence[1:]
-    
+
     # Try /charge format first
-    slash_charge_pattern = r'/(\d+)$'
+    slash_charge_pattern = r"/(\d+)$"
     slash_match = re.search(slash_charge_pattern, sequence)
-    
+
     if slash_match:
         charge_state = int(slash_match.group(1))
         if 1 <= charge_state <= 20:
-            sequence_without_charge = re.sub(slash_charge_pattern, '', sequence)
+            sequence_without_charge = re.sub(slash_charge_pattern, "", sequence)
             return leading_dot + sequence_without_charge, charge_state
-    
+
     # Try trailing number as charge
-    trailing_number_pattern = r'(\d+)$'
+    trailing_number_pattern = r"(\d+)$"
     number_match = re.search(trailing_number_pattern, sequence)
-    
+
     if number_match:
         charge_state = int(number_match.group(1))
         if 1 <= charge_state <= 20:
-            sequence_without_charge = re.sub(trailing_number_pattern, '', sequence)
+            sequence_without_charge = re.sub(trailing_number_pattern, "", sequence)
             return leading_dot + sequence_without_charge, charge_state
-    
+
     return leading_dot + sequence, 1
 
 
@@ -578,8 +612,10 @@ def parse_sequence_with_mods_and_charge(sequence: str) -> Tuple[str, str, int]:
 
     """
     sequence_no_charge, charge_state = parse_charge_notation(sequence)
-    clean_sequence, modified_sequence = parse_square_bracket_modifications(sequence_no_charge)
-    
+    clean_sequence, modified_sequence = parse_square_bracket_modifications(
+        sequence_no_charge
+    )
+
     return clean_sequence, modified_sequence, charge_state
 
 
@@ -595,9 +631,9 @@ def detect_modification_from_sequence(sequence: str) -> str:
         str: The detected modification name matching dropdown options, or "None" if no modification detected.
 
     """
-    if not re.search(r'[\[\(]', sequence):
+    if not re.search(r"[\[\(]", sequence):
         return "None"
-    
+
     try:
         clean_sequence, openms_sequence = parse_square_bracket_modifications(sequence)
     except Exception:
@@ -608,20 +644,22 @@ def detect_modification_from_sequence(sequence: str) -> str:
 
     # Pattern matching for common modifications (converted to OpenMS format)
     modification_patterns = {
-        r'\(Oxidation\)': "Oxidation (M)",
-        r'\(Carbamidomethyl\)': "Carbamidomethyl (C)", 
-        r'\(Phospho\)': "Phosphorylation (S/T/Y)",
-        r'^\.\(Acetyl\)': "Acetylation (N-term)",
-        r'\(Methyl\)': "Methylation (K/R)",
-        r'\(Deamidated\)': "Deamidation (N/Q)"
+        r"\(Oxidation\)": "Oxidation (M)",
+        r"\(Carbamidomethyl\)": "Carbamidomethyl (C)",
+        r"\(Phospho\)": "Phosphorylation (S/T/Y)",
+        r"^\.\(Acetyl\)": "Acetylation (N-term)",
+        r"\(Methyl\)": "Methylation (K/R)",
+        r"\(Deamidated\)": "Deamidation (N/Q)",
     }
-    
+
     for pattern, dropdown_name in modification_patterns.items():
         if re.search(pattern, openms_sequence):
             return dropdown_name
-    
+
     # Check for mass deltas using ModificationsDB
-    mass_delta_match = re.search(r'\[([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\]', openms_sequence)
+    mass_delta_match = re.search(
+        r"\[([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\]", openms_sequence
+    )
     if mass_delta_match:
         try:
             mass_delta = float(mass_delta_match.group(1))
@@ -630,11 +668,13 @@ def detect_modification_from_sequence(sequence: str) -> str:
                 return detected_mod
         except ValueError:
             pass
-    
+
     return "None"
 
 
-def _match_mass_delta_to_modification(mass_delta: float, tolerance: float = 0.01) -> str:
+def _match_mass_delta_to_modification(
+    mass_delta: float, tolerance: float = 0.01
+) -> str:
     """Match a mass delta to a known modification using ModificationsDB.
 
     Args:
@@ -648,7 +688,7 @@ def _match_mass_delta_to_modification(mass_delta: float, tolerance: float = 0.01
     try:
         mod_db = _get_pyopenms_mod_db()
         poms = _get_pyopenms()
-        
+
         # modification names and their known mass deltas
         known_mods = {
             "Carbamidomethyl (C)": [57.021464, 57.0214, 57.02, 57.0],
@@ -656,15 +696,15 @@ def _match_mass_delta_to_modification(mass_delta: float, tolerance: float = 0.01
             "Phosphorylation (S/T/Y)": [79.966331, 79.9663, 79.97, 80.0],
             "Acetylation (N-term)": [42.010565, 42.0106, 42.01, 42.0],
             "Methylation (K/R)": [14.015650, 14.0157, 14.02, 14.0],
-            "Deamidation (N/Q)": [0.984016, 0.9840, 0.98, 1.0]
+            "Deamidation (N/Q)": [0.984016, 0.9840, 0.98, 1.0],
         }
-        
+
         # directly check known modifications first
         for mod_name, masses in known_mods.items():
             for known_mass in masses:
                 if abs(mass_delta - known_mass) <= tolerance:
                     return mod_name
-        
+
         # if not found, check ModificationsDB
         mod_id_to_dropdown = {
             "Oxidation": "Oxidation (M)",
@@ -672,23 +712,23 @@ def _match_mass_delta_to_modification(mass_delta: float, tolerance: float = 0.01
             "Phospho": "Phosphorylation (S/T/Y)",
             "Acetyl": "Acetylation (N-term)",
             "Methyl": "Methylation (K/R)",
-            "Deamidated": "Deamidation (N/Q)"
+            "Deamidated": "Deamidation (N/Q)",
         }
-        
+
         for mod_id in mod_id_to_dropdown.keys():
             try:
                 mod = mod_db.getModification(mod_id)
                 mod_mass = mod.getDiffMonoMass()
-                
+
                 if abs(mass_delta - mod_mass) <= tolerance:
                     return mod_id_to_dropdown[mod_id]
-                    
+
             except Exception:
                 continue
-                
+
     except Exception:
         pass
-    
+
     return "None"
 
 
@@ -706,20 +746,20 @@ def parse_proforma_sequence(sequence: str) -> Tuple[str, str, bool]:
 
     """
     sequence = sequence.strip()
-    if sequence.startswith('.'):
+    if sequence.startswith("."):
         sequence = sequence[1:]
-    
+
     poms = _get_pyopenms()
-    
+
     # Try direct PyOpenMS parsing for ProForma-style arbitrary mass shifts
     try:
         test_seq = poms.AASequence.fromString(sequence)
-        import re
-        clean_sequence = re.sub(r'\[([^\]]+)\]', '', sequence)
+
+        clean_sequence = re.sub(r"\[([^\]]+)\]", "", sequence)
         return clean_sequence, sequence, True
     except Exception:
         pass
-    
+
     # Fall back to traditional conversion
     clean_sequence, converted_sequence = parse_square_bracket_modifications(sequence)
     return clean_sequence, converted_sequence, False
@@ -743,37 +783,37 @@ def analyze_peptide_sequence(sequence: str) -> SequenceAnalysis:
 
     """
     analysis = SequenceAnalysis()
-    
+
     if not sequence or not sequence.strip():
         analysis.is_valid = False
-        analysis.error_message = ERROR_MESSAGES['empty_sequence']
+        analysis.error_message = ERROR_MESSAGES["empty_sequence"]
         return analysis
-    
+
     try:
         _, _, extracted_charge = parse_sequence_with_mods_and_charge(sequence)
         if extracted_charge > 1:
             analysis.charge = extracted_charge
             analysis.charge_detected = True
-        
+
         detected_modification = detect_modification_from_sequence(sequence)
         if detected_modification != "None":
             analysis.modification = detected_modification
             analysis.modification_detected = True
-            
+
         is_valid, clean_sequence = validate_peptide_sequence(sequence)
         analysis.is_valid = is_valid
         analysis.clean_sequence = clean_sequence
-        
+
         if not is_valid:
-            analysis.error_message = ERROR_MESSAGES['invalid_amino_acid']
+            analysis.error_message = ERROR_MESSAGES["invalid_amino_acid"]
         elif len(clean_sequence) == 0:
-            analysis.error_message = ERROR_MESSAGES['invalid_sequence_length']
+            analysis.error_message = ERROR_MESSAGES["invalid_sequence_length"]
             analysis.is_valid = False
-            
+
     except Exception as e:
         analysis.is_valid = False
-        analysis.error_message = ERROR_MESSAGES['unexpected_error'].format(error=str(e))
-    
+        analysis.error_message = ERROR_MESSAGES["unexpected_error"].format(error=str(e))
+
     return analysis
 
 
