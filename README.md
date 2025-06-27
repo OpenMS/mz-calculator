@@ -6,8 +6,8 @@
 </div>
 
 <p align="center">
-  <a href="https://github.com/achalbajpai/peptide-mz-calculator/issues">Report Bug</a> • 
-  <a href="https://github.com/achalbajpai/peptide-mz-calculator/issues">Request Feature</a>
+  <a href="https://github.com/achalbajpai/peptide-mz-calculator/issues">Report Bug/Feature</a> • 
+  <a href="https://github.com/achalbajpai/peptide-mz-calculator/pulls">Submit Code Changes</a>
 </p>
 
 
