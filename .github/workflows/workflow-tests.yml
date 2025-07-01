@@ -2,12 +2,12 @@ name: Test workflow functions
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "week-*" ]
   pull_request:
     branches: [ "main" ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -20,9 +20,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest
-    - name: Running test cases
+    - name: Run unit tests
       run: |
-        pytest test.py
-    - name: Running GUI tests
+        pytest tests/ -v
+      env:
+        PYTHONPATH: .
+    - name: Run GUI tests
       run: |
-        pytest test_gui.py
+        pytest test_gui.py -v
+      env:
+        PYTHONPATH: .
