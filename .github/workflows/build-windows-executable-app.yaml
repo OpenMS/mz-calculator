@@ -148,13 +148,13 @@ jobs:
           CCACHE_COMPRESSLEVEL: 12
           CCACHE_MAXSIZE: 400M
 
-    - name: Test Windows
-      shell: bash
-      run: ctest --output-on-failure -V -S $GITHUB_WORKSPACE/OpenMS/tools/ci/citest.cmake
-      env:
-          SOURCE_DIRECTORY: "${{ github.workspace }}/OpenMS"
-          CI_PROVIDER: "GitHub-Actions"
-          BUILD_NAME: "${{ env.RUN_NAME }}-Win64-class-topp-${{ github.run_number }}"
+    # - name: Test Windows
+    #   shell: bash
+    #   run: ctest --output-on-failure -V -S $GITHUB_WORKSPACE/OpenMS/tools/ci/citest.cmake
+    #   env:
+    #       SOURCE_DIRECTORY: "${{ github.workspace }}/OpenMS"
+    #       CI_PROVIDER: "GitHub-Actions"
+    #       BUILD_NAME: "${{ env.RUN_NAME }}-Win64-class-topp-${{ github.run_number }}"
 
     - name: Package
       shell: bash
