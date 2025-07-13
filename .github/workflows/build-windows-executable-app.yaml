@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 env:
-  OPENMS_VERSION: 3.3.0 
+  OPENMS_VERSION: 3.2.0 
   PYTHON_VERSION: 3.11.0
   # Name of the installer
   APP_NAME: OpenMS-StreamlitTemplateApp
@@ -84,7 +84,7 @@ jobs:
       run: |
         cd OpenMS/contrib
         # Download the file using the URL fetched from GitHub
-        gh release download -R OpenMS/contrib --pattern 'contrib_build-Windows.tar.gz'
+        gh release download release/3.2.0 -R OpenMS/contrib --pattern 'contrib_build-Windows.tar.gz'
         # Extract the archive
         7z x -so contrib_build-Windows.tar.gz | 7z x -si -ttar
         rm contrib_build-Windows.tar.gz
