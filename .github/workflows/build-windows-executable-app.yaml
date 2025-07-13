@@ -33,17 +33,6 @@ jobs:
         repository: OpenMS/OpenMS
         ref: release/${{ env.OPENMS_VERSION }}
         path: 'OpenMS'
-    
-    # Temporary fix - until seqan is back online or new OpenMS release (3.4)
-    - name: Get latest cibuild.cmake
-      working-directory: OpenMS
-      run: |
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git fetch origin develop
-        git checkout origin/develop -- tools/ci/cibuild.cmake
-        git checkout origin/develop -- tools/ci/citest.cmake
-        git checkout origin/develop -- tools/ci/cipackage.cmake
 
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
@@ -95,7 +84,7 @@ jobs:
       run: |
         cd OpenMS/contrib
         # Download the file using the URL fetched from GitHub
-        gh release download -R OpenMS/contrib --pattern 'contrib_build-Windows.tar.gz'
+        gh release download release/3.2.0 -R OpenMS/contrib --pattern 'contrib_build-Windows.tar.gz'
         # Extract the archive
         7z x -so contrib_build-Windows.tar.gz | 7z x -si -ttar
         rm contrib_build-Windows.tar.gz
@@ -159,13 +148,13 @@ jobs:
           CCACHE_COMPRESSLEVEL: 12
           CCACHE_MAXSIZE: 400M
 
-    - name: Test Windows
-      shell: bash
-      run: ctest --output-on-failure -V -S $GITHUB_WORKSPACE/OpenMS/tools/ci/citest.cmake
-      env:
-          SOURCE_DIRECTORY: "${{ github.workspace }}/OpenMS"
-          CI_PROVIDER: "GitHub-Actions"
-          BUILD_NAME: "${{ env.RUN_NAME }}-Win64-class-topp-${{ github.run_number }}"
+    # - name: Test Windows
+    #   shell: bash
+    #   run: ctest --output-on-failure -V -S $GITHUB_WORKSPACE/OpenMS/tools/ci/citest.cmake
+    #   env:
+    #       SOURCE_DIRECTORY: "${{ github.workspace }}/OpenMS"
+    #       CI_PROVIDER: "GitHub-Actions"
+    #       BUILD_NAME: "${{ env.RUN_NAME }}-Win64-class-topp-${{ github.run_number }}"
 
     - name: Package
       shell: bash

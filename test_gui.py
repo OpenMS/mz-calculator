@@ -22,18 +22,9 @@ def launch(request):
 @pytest.mark.parametrize(
     "launch",
     (
-        # "content/quickstart.py", # NOTE: this page does not work due to streamlit.errors.StreamlitPageNotFoundError error
-        "content/documentation.py",
-        "content/topp_workflow_file_upload.py",
-        "content/topp_workflow_parameter.py",
-        "content/topp_workflow_execution.py",
-        "content/topp_workflow_results.py",
-        "content/file_upload.py",
-        "content/raw_data_viewer.py",
-        "content/run_example_workflow.py",
-        "content/download_section.py",
-        "content/simple_workflow.py",
-        "content/run_subprocess.py",
+        "content/quickstart.py",  # Main peptide calculator page
+        "content/docs.py",       # Documentation page
+        "content/visualization.py", # Visualization page
     ),
     indirect=True,
 )
@@ -47,15 +38,9 @@ def test_launch(launch):
 @pytest.mark.parametrize(
     "launch,selection",
     [
-        ("content/documentation.py", "User Guide"),
-        ("content/documentation.py", "Installation"),
-        (
-            "content/documentation.py",
-            "Developers Guide: How to build app based on this template",
-        ),
-        ("content/documentation.py", "Developers Guide: TOPP Workflow Framework"),
-        ("content/documentation.py", "Developer Guide: Windows Executables"),
-        ("content/documentation.py", "Developers Guide: Deployment"),
+        ("content/docs.py", "User Guide"),
+        ("content/docs.py", "What's New"),
+        ("content/docs.py", "Feature Overview"),
     ],
     indirect=["launch"],
 )
@@ -65,70 +50,54 @@ def test_documentation(launch, selection):
     assert not launch.exception
 
 
-@pytest.mark.parametrize("launch", ["content/file_upload.py"], indirect=True)
-def test_file_upload_load_example(launch):
+# Test peptide calculator basic functionality
+@pytest.mark.parametrize("launch", ["content/quickstart.py"], indirect=True)
+def test_peptide_calculator_basic(launch):
+    """Test basic peptide calculator functionality."""
     launch.run()
-    for i in launch.tabs:
-        if i.label == "Example Data":
-            i.button[0].click().run()
-            assert not launch.exception
+    
+    # Check if basic elements are present
+    assert len(launch.text_input) > 0, "Peptide sequence input not found"
+    assert len(launch.selectbox) > 0, "Modification dropdown not found"
+    assert len(launch.number_input) > 0, "Charge state input not found"
+    assert len(launch.button) > 0, "Calculate button not found"
 
 
-# NOTE: All tabs are automatically checked
+# Test peptide calculator with valid input
 @pytest.mark.parametrize(
-    "launch,example",
+    "launch,sequence,charge",
     [
-        ("content/raw_data_viewer.py", "Blank.mzML"),
-        ("content/raw_data_viewer.py", "Treatment.mzML"),
-        ("content/raw_data_viewer.py", "Pool.mzML"),
-        ("content/raw_data_viewer.py", "Control.mzML"),
+        ("content/quickstart.py", "PEPTIDE", 2),
+        ("content/quickstart.py", "METHIONINE", 1),
+        ("content/quickstart.py", "STREAMLIT", 3),
     ],
     indirect=["launch"],
 )
-def test_view_raw_ms_data(launch, example):
-    launch.run(timeout=30)  # Increased timeout from 10 to 30 seconds
-
-    ## Load Example file, based on implementation of fileupload.load_example_mzML_files() ###
-    mzML_dir = Path(launch.session_state.workspace, "mzML-files")
-
-    # Copy files from example-data/mzML to workspace mzML directory, add to selected files
-    for f in Path("example-data", "mzML").glob("*.mzML"):
-        shutil.copy(f, mzML_dir)
+def test_peptide_calculator_calculation(launch, sequence, charge):
+    """Test peptide calculator with different inputs."""
     launch.run()
-
-    ## TODO: Figure out a way to select a spectrum to be displayed
-    launch.selectbox[0].select(example).run()
+    
+    # Input sequence
+    if len(launch.text_input) > 0:
+        launch.text_input[0].set_value(sequence)
+    
+    # Set charge state
+    if len(launch.number_input) > 0:
+        launch.number_input[0].set_value(charge)
+    
+    launch.run()
+    
+    # Click calculate button if present
+    if len(launch.button) > 0:
+        launch.button[0].click()
+        launch.run()
+    
     assert not launch.exception
 
 
-@pytest.mark.parametrize(
-    "launch,example",
-    [
-        ("content/run_example_workflow.py", ["Blank"]),
-        ("content/run_example_workflow.py", ["Treatment"]),
-        ("content/run_example_workflow.py", ["Pool"]),
-        ("content/run_example_workflow.py", ["Control"]),
-        ("content/run_example_workflow.py", ["Control", "Blank"]),
-    ],
-    indirect=["launch"],
-)
-def test_run_workflow(launch, example):
+# Test visualization page
+@pytest.mark.parametrize("launch", ["content/visualization.py"], indirect=True)
+def test_visualization_page(launch):
+    """Test that visualization page loads without errors."""
     launch.run()
-    ## Load Example file, based on implementation of fileupload.load_example_mzML_files() ###
-    mzML_dir = Path(launch.session_state.workspace, "mzML-files")
-
-    # Copy files from example-data/mzML to workspace mzML directory, add to selected files
-    for f in Path("example-data", "mzML").glob("*.mzML"):
-        shutil.copy(f, mzML_dir)
-    launch.run()
-
-    ## Select experiments to process
-    for e in example:
-        launch.multiselect[0].select(e)
-
-    launch.run()
-    assert not launch.exception
-
-    # Press the "Run Workflow" button
-    launch.button[1].click().run(timeout=60)
     assert not launch.exception
