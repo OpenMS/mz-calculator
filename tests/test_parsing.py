@@ -122,6 +122,29 @@ class TestParsingFunctions:
         )
         assert clean_seq == "CPEPTIDE"
 
+    def test_parse_square_bracket_modifications_x_mass_delta(self, mock_pyopenms):
+        """Test X[+mass] parsing - special handling for unknown amino acids with mass deltas."""
+        # Test the original problematic sequence
+        clean_seq, openms_seq = parse_square_bracket_modifications("RTAAX[+367.0537]WT")
+        assert clean_seq == "RTAAXWT"
+        # The + prefix should be removed for X residues
+        assert openms_seq == "RTAAX[367.0537]WT"
+
+        # Test without + prefix (should remain unchanged)
+        clean_seq, openms_seq = parse_square_bracket_modifications("RTAAX[367.0537]WT")
+        assert clean_seq == "RTAAXWT"
+        assert openms_seq == "RTAAX[367.0537]WT"
+
+        # Test negative mass on X (should keep negative sign)
+        clean_seq, openms_seq = parse_square_bracket_modifications("PEPX[-18.0]TIDE")
+        assert clean_seq == "PEPXTIDE"
+        assert openms_seq == "PEPX[-18.0]TIDE"
+
+        # Test other mass formats on X
+        clean_seq, openms_seq = parse_square_bracket_modifications("X[100]PEPTIDE")
+        assert clean_seq == "XPEPTIDE"
+        assert openms_seq == "X[100]PEPTIDE"
+
     def test_parse_square_bracket_modifications_unimod(self, mock_pyopenms):
         """Test UNIMOD notation parsing (e.g., UNIMOD:4 for carbamidomethyl)."""
         clean_seq, openms_seq = parse_square_bracket_modifications("C[UNIMOD:4]PEPTIDE")

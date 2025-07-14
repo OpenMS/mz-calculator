@@ -255,6 +255,45 @@ class TestCalculationFunctions:
                 assert result["monoisotopic_mass"] == 911.55
                 assert result["molecular_formula"] == "C40H65N11O11S"
 
+    def test_calculate_peptide_mz_x_mass_delta_fix(self, mock_pyopenms):
+        """Test calculation with X[+mass] sequences - regression test for issue fix."""
+
+        # Setup mock AASequence to fail on original sequence but succeed on corrected one
+        def mock_from_string(sequence):
+            if sequence == "RTAAX[+367.0537]WT":
+                # This should fail, forcing the function to use our parsing logic
+                raise RuntimeError(
+                    "Using a mass difference to specify a modification on a residue of unknown mass is not supported"
+                )
+            else:
+                # Return mock for the corrected sequence
+                mock_aa_seq = MagicMock()
+                mock_aa_seq.getMZ.return_value = 536.7144
+                mock_aa_seq.getMonoWeight.return_value = 1071.4143
+                mock_aa_seq.getFormula.return_value.toString.return_value = (
+                    "C31H48N10O9"
+                )
+                return mock_aa_seq
+
+        mock_pyopenms.AASequence.fromString.side_effect = mock_from_string
+
+        with patch("src.peptide_calculator.parse_charge_notation") as mock_charge:
+            mock_charge.return_value = ("RTAAX[+367.0537]WT", 1)
+
+            result = calculate_peptide_mz("RTAAX[+367.0537]WT", 2)
+
+            # Verify the calculation
+            assert result["success"] is True
+            assert result["mz_ratio"] == 536.7144
+            assert result["monoisotopic_mass"] == 1071.4143
+            assert result["original_sequence"] == "RTAAXWT"
+            assert result["modified_sequence"] == "RTAAX[367.0537]WT"
+            assert result["charge_state"] == 2
+            assert result["sequence_length"] == 7
+
+            # Verify the corrected sequence was used for PyOpenMS call
+            assert mock_pyopenms.AASequence.fromString.call_count == 2
+
 
 class TestValidateOpenMSSequence:
     """Test cases for OpenMS sequence validation."""
