@@ -62,9 +62,9 @@ page_setup(page="main")
 # Hero section
 st.markdown(
     """
-<div style="text-align: center; padding: 2rem 0;">
-    <h1 style="font-size: 3rem; margin-bottom: 0.5rem;">👋 Welcome to the Peptide M/Z Calculator</h1>
-    <p style="font-size: 1.2rem; color: #666; margin-bottom: 2rem;">
+<div style="text-align: center; padding: 1rem 0;">
+    <h1 style="font-size: 2rem; margin-bottom: 0.2rem;">👋 Welcome to the Peptide M/Z Calculator</h1>
+    <p style="font-size: 1rem; color: #666; margin-bottom: 0.5rem;">
         Accurate mass-to-charge ratio calculations for proteomics research
     </p>
 </div>
@@ -73,9 +73,9 @@ st.markdown(
 )
 
 # Logo Section
-col1, col2, col3 = st.columns([1, 1.5, 0.5])
+col1, col2, col3 = st.columns([1, 1.5, 0.2])
 with col2:
-    st.image("assets/openms_transparent_bg_logo.svg", width=400)
+    st.image("assets/openms_transparent_bg_logo.svg", width=200)
 
 st.markdown(
     """
@@ -89,15 +89,20 @@ st.markdown(
     """
 This calculator determines the mass-to-charge (m/z) ratio of peptides based on their amino acid sequence, 
 charge state, and modifications. It uses the pyOpenMS library for accurate mass spectrometry calculations.
+"""
+)
 
+with st.expander("❓ How to use", expanded=False):
+    st.markdown(
+        """
 **How to use:**
 1.  **Enter Sequence:** Type your peptide sequence (e.g., `PEPTIDE`).
 2.  **Add Modifications (Optional):** Include modifications in brackets (e.g., `M[Oxidation]`, `C[+57.021464]`) or UNIMOD notation (e.g., `C[UNIMOD:4]`).
 3.  **Specify Charge (Optional):** Add a slash and the charge number to your sequence (e.g., `PEPTIDE/2`).
 4.  **Auto-Detect:** Modifications and charge are automatically recognized.
 5.  **Calculate:** Click "Calculate m/z".
-"""
-)
+        """
+    )
 
 # info ( most of it will be moved to documentation later on, kept it for now as it was useful during development )
 with st.expander("📝 Advanced Notation Examples", expanded=False):
