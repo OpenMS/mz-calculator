@@ -65,8 +65,7 @@ st.markdown(
 <div style="text-align: center; padding: 1rem 0;">
     <h1 style="font-size: 2rem; margin-bottom: 0.2rem;">👋 Welcome to the Peptide M/Z Calculator</h1>
     <p style="font-size: 1rem; color: #666; margin-bottom: 0.5rem;">
-        Accurate mass-to-charge ratio calculations for proteomics research
-    </p>
+Theoretical mass-to-charge ratio calculations for proteomics research    </p>
 </div>
 """,
     unsafe_allow_html=True,
@@ -88,7 +87,7 @@ st.markdown(
 st.markdown(
     """
 This calculator determines the mass-to-charge (m/z) ratio of peptides based on their amino acid sequence, 
-charge state, and modifications. It uses the pyOpenMS library for accurate mass spectrometry calculations.
+charge state, and modifications. It uses the pyOpenMS library for theoretical mass spectrometry calculations.
 """
 )
 
@@ -375,7 +374,7 @@ with st.expander("ℹ️ About this Calculator"):
     - Can be combined with any modification format
     
     **Calculation Method:**
-    - Uses pyOpenMS AASequence class for accurate mass calculations
+    - Uses pyOpenMS AASequence class for theoretical mass calculations
     - Monoisotopic masses are used for all calculations
     - m/z ratio is calculated as: (Monoisotopic Mass + Charge x Proton Mass) / Charge
     
