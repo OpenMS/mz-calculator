@@ -154,6 +154,17 @@ def parse_square_bracket_modifications(sequence: str) -> Tuple[str, str]:
     def replace_aa_mod(match):
         aa = match.group(1)
         mod_text = match.group(2)
+
+        if aa == "X":
+            mass_delta_pattern = r"^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$"
+            if re.match(mass_delta_pattern, mod_text.strip()):
+                clean_mass = mod_text.strip()
+                if clean_mass.startswith("+"):
+                    clean_mass = clean_mass[1:]
+                elif clean_mass.startswith("-"):
+                    pass
+                return f"{aa}[{clean_mass}]"
+
         converted_mod = convert_modification(mod_text)
 
         if converted_mod.startswith("[") and converted_mod.endswith("]"):
