@@ -59,29 +59,22 @@ if "last_analysis" not in st.session_state:
 # Page setup
 page_setup(page="main")
 
-# Hero section
-st.markdown(
-    """
-<div style="text-align: center; padding: 1rem 0;">
-    <h1 style="font-size: 2rem; margin-bottom: 0.2rem;">👋 Welcome to the Peptide M/Z Calculator</h1>
-    <p style="font-size: 1rem; color: #666; margin-bottom: 0.5rem;">
-Theoretical mass-to-charge ratio calculations for proteomics research    </p>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-# Logo Section
-col1, col2, col3 = st.columns([1, 1.5, 0.2])
+# Hero section && logo
+col1, col2, col3 = st.columns([0.5, 2, 1])
 with col2:
-    st.image("assets/openms_transparent_bg_logo.svg", width=200)
-
-st.markdown(
-    """
-<hr style="height:2px;border-width:0;color:gray;background-color:gray">
-""",
-    unsafe_allow_html=True,
-)
+    st.markdown(
+        """
+    <div style="text-align: center; padding: 0.5rem 0;">
+        <h1 style="font-size: 2rem; margin-bottom: 0.2rem;">👋 Welcome to the Peptide M/Z Calculator</h1>
+        <p style="font-size: 1rem; color: #666; margin-bottom: 0.5rem;">
+            Theoretical mass-to-charge ratio calculations for proteomics research
+        </p>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
+with col3:
+    st.image("assets/openms_transparent_bg_logo.svg", width=150)
 
 # working explanation
 st.markdown(
