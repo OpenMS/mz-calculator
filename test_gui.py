@@ -58,8 +58,8 @@ def test_peptide_calculator_basic(launch):
     
     # Check if basic elements are present
     assert len(launch.text_input) > 0, "Peptide sequence input not found"
-    assert len(launch.selectbox) > 0, "Modification dropdown not found"
-    assert len(launch.number_input) > 0, "Charge state input not found"
+    assert len(launch.checkbox) > 0, "Modification checkboxes not found"
+    assert len(launch.slider) > 0, "Charge state input not found"
     assert len(launch.button) > 0, "Calculate button not found"
 
 

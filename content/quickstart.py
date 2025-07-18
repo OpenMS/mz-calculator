@@ -6,6 +6,7 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, Any, Optional, Tuple
 import streamlit as st
+import pandas as pd
 
 from src.common.common import page_setup, v_space
 
@@ -14,6 +15,7 @@ from src.peptide_calculator import (
     validate_peptide_sequence,
     apply_modification,
     calculate_peptide_mz,
+    calculate_peptide_mz_range,
     get_supported_modifications,
     get_square_bracket_examples,
     parse_square_bracket_modifications,
@@ -30,9 +32,9 @@ from src.peptide_calculator import (
 # Configuration constants
 class Config:
     DEFAULT_CHARGE = 2
-    MAX_CHARGE = 10
+    MAX_CHARGE = 100
     MIN_CHARGE = 1
-    DEFAULT_SEQUENCE = "PEPTIDE"
+    DEFAULT_SEQUENCE = "PEPTIDEC[+57.021464]"
     VALID_AMINO_ACIDS = "ARNDCEQGHILKMFPSTWYV X U"
 
 
@@ -89,14 +91,14 @@ with st.expander("❓ How to use", expanded=False):
         """
 **How to use:**
 1.  **Enter Sequence:** Type your peptide sequence (e.g., `PEPTIDE`).
-2.  **Add Modifications (Optional):** Include modifications in brackets (e.g., `M[Oxidation]`, `C[+57.021464]`) or UNIMOD notation (e.g., `C[UNIMOD:4]`).
+2.  **Add Static Modifications (Optional):** Include static modifications in brackets (e.g., `M[Oxidation]`, `C[+57.021464]`) or UNIMOD notation (e.g., `C[UNIMOD:4]`).
 3.  **Specify Charge (Optional):** Add a slash and the charge number to your sequence (e.g., `PEPTIDE/2`).
 4.  **Auto-Detect:** Modifications and charge are automatically recognized.
 5.  **Calculate:** Click "Calculate m/z".
         """
     )
 
-# info ( most of it will be moved to documentation later on, kept it for now as it was useful during development )
+# Advanced notation
 with st.expander("📝 Advanced Notation Examples", expanded=False):
     st.markdown("**Supported sequence formats:**")
     examples = cached_examples()
@@ -167,8 +169,14 @@ with col1_calc:
     peptide_sequence = st.text_input(
         "Peptide Sequence",
         value=Config.DEFAULT_SEQUENCE,
-        help="Enter the peptide sequence",
-        placeholder="e.g., PEPTIDE, M[Oxidation]PEPTIDE, .LLVLPKFGM[+15.9949]LMLGPDDFR, PEPTIDE/2, or QVVPC[+57.021464]STSER2",
+        help="""Enter the peptide sequence. Examples:
+        • PEPTIDE - Basic sequence
+        • M[Oxidation]PEPTIDE - Named modification
+        • C[+57.021464]PEPTIDE - Mass delta
+        • PEPTIDE/2 - With charge notation
+        • [Acetyl]PEPTIDE - N-terminal modification
+        • M[UNIMOD:35]PEPTIDE - UNIMOD notation""",
+        placeholder="e.g., PEPTIDE, M[Oxidation]PEPTIDE, C[+57.021464]PEPTIDE, PEPTIDE/2",
     )
 
     # analyze sequence only if it has changed to avoid unnecessary processing
@@ -187,46 +195,83 @@ with col1_calc:
             f"🧪 Modification '{analysis.modification}' detected from sequence notation"
         )
 
-    # --- START OF MODIFICATION FIX ---
     # Get the raw list of modifications from the cache
     raw_modification_list = cached_modifications()
 
-    # Filter out "None" if it's present in the raw list, then prepend it to ensure it's always first.
-    modification_options = ["None"] + [
-        mod for mod in raw_modification_list if mod != "None"
+    # Filter to only include specific modifications
+    allowed_modifications = [
+        "Carbamidomethyl (C)",
+        "Acetylation (N-term)",
+    ]
+    filtered_modifications = [
+        mod for mod in raw_modification_list if mod in allowed_modifications
     ]
 
-    # Get the index for the detected modification
-    try:
-        detected_index = modification_options.index(analysis.modification)
-    except ValueError:
-        detected_index = 0  # Default to "None" if not found
-    # --- END OF MODIFICATION FIX ---
+    modification_options = list(set(filtered_modifications))
 
     # Modification selection with auto-updated value
-    modifications = st.selectbox(
-        "Modifications (Optional)",
-        options=modification_options,
-        index=detected_index,
-        help="Select a common modification to apply to the peptide. Auto-updates when modifications are detected in sequence notation.",
-        key="modification_input",
-    )
+    default_modifications = []
+    if analysis.modification_detected and analysis.modification in modification_options:
+        default_modifications = [analysis.modification]
+    elif (
+        not analysis.modification_detected
+        and "Carbamidomethyl (C)" in modification_options
+    ):
+        default_modifications = ["Carbamidomethyl (C)"]
+
+    st.markdown("**Static Modifications (Optional)**")
+    st.caption("Select one or more common modifications to apply to the peptide.")
+
+    modifications = []
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        carbamidomethyl_default = "Carbamidomethyl (C)" in default_modifications
+        carbamidomethyl_selected = st.checkbox(
+            "Carbamidomethyl (C)",
+            value=carbamidomethyl_default,
+            key="carbamidomethyl_checkbox",
+        )
+        if carbamidomethyl_selected:
+            modifications.append("Carbamidomethyl (C)")
+
+    with col2:
+        if "Acetylation (N-term)" in modification_options:
+            acetylation_default = "Acetylation (N-term)" in default_modifications
+            acetylation_selected = st.checkbox(
+                "Acetylation (N-term)",
+                value=acetylation_default,
+                key="acetylation_checkbox",
+            )
+            if acetylation_selected:
+                modifications.append("Acetylation (N-term)")
 
 with col2_calc:
     # Display info if charge is detected from sequence
     if analysis.charge_detected:
         st.info(f"🔗 Charge state {analysis.charge} detected from sequence notation")
 
-    # Charge State input with auto-updated value
-    charge_state = st.number_input(
-        "Charge State",
-        min_value=Config.MIN_CHARGE,
-        max_value=Config.MAX_CHARGE,
-        value=analysis.charge,
-        step=1,
-        help="Enter the charge state (number of protons added). Auto-updates when charge notation is detected in sequence.",
-        key="charge_input",
-    )
+    if analysis.charge_detected:
+        charge_range = st.slider(
+            "Charge State Range",
+            min_value=Config.MIN_CHARGE,
+            max_value=Config.MAX_CHARGE,
+            value=(analysis.charge, analysis.charge),
+            step=1,
+            help="Charge state detected from sequence notation. Range is fixed to detected value.",
+            key="charge_input",
+        )
+    else:
+        charge_range = st.slider(
+            "Charge State Range",
+            min_value=Config.MIN_CHARGE,
+            max_value=Config.MAX_CHARGE,
+            value=(2, 4),
+            step=1,
+            help="Select the charge state range to calculate m/z ratios for multiple charge states.",
+            key="charge_input",
+        )
 
     calculate_button = st.button(
         (
@@ -259,9 +304,9 @@ if calculate_button:
             st.session_state.calculation_in_progress = False
         else:
             try:
-                with st.spinner("Calculating m/z ratio..."):
-                    results = calculate_peptide_mz(
-                        peptide_sequence, charge_state, modifications
+                with st.spinner("Calculating m/z ratios..."):
+                    results = calculate_peptide_mz_range(
+                        peptide_sequence, charge_range, modifications
                     )
 
                 st.success("✅ Calculation Successful!")
@@ -270,15 +315,41 @@ if calculate_button:
                 result_col1, result_col2 = st.columns(2)
 
                 with result_col1:
-                    st.markdown("### 📊 Results")
-                    st.markdown(
-                        f"**m/z:** {results['mz_ratio']:.6f} (incl. {results['charge_state']}H+)"
-                    )
+                    st.markdown("### 📊 m/z Results")
 
-                    charge_display = f"**Charge:** +{results['charge_state']}"
-                    if results.get("charge_source") == "From sequence notation":
-                        charge_display += " 🔗"
-                    st.markdown(charge_display)
+                    charge_results = results.get("charge_results", {})
+                    charge_states = sorted(charge_results.keys())
+
+                    if len(charge_states) <= 5:
+                        for charge_state in charge_states:
+                            charge_data = charge_results[charge_state]
+                            charge_display = f"**Charge +{charge_state}:** {charge_data['mz_ratio']:.6f}"
+                            if (
+                                charge_data.get("charge_source")
+                                == "From sequence notation"
+                            ):
+                                charge_display += " 🔗"
+                            st.markdown(charge_display)
+                    else:
+                        st.markdown("**m/z Values by Charge State:**")
+
+                        table_data = []
+                        for charge_state in charge_states:
+                            charge_data = charge_results[charge_state]
+                            table_data.append(
+                                {
+                                    "Charge": f"+{charge_state}",
+                                    "m/z": f"{charge_data['mz_ratio']:.6f}",
+                                }
+                            )
+
+                        df = pd.DataFrame(table_data)
+                        st.dataframe(df, use_container_width=True, hide_index=True)
+
+                        if len(charge_states) > 20:
+                            st.caption(
+                                f"Showing {len(charge_states)} charge states (scroll table to see all)"
+                            )
 
                     st.markdown(
                         f"**Monoisotopic Mass:** {results['monoisotopic_mass']:.6f} Da (uncharged)"
@@ -289,10 +360,9 @@ if calculate_button:
                     st.markdown(
                         f"**Original Sequence:** {results['original_sequence']}"
                     )
-                    if results["modification"] != "None":
-                        st.markdown(
-                            f"**Modified Sequence:** {results['modified_sequence']}"
-                        )
+                    st.markdown(
+                        f"**Modified Sequence:** {results['modified_sequence']}"
+                    )
                     st.markdown(
                         f"**Molecular Formula:** {results['molecular_formula']}"
                     )
