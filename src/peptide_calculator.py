@@ -5,7 +5,7 @@ This module provides backend functions for peptide mass spectrometry calculation
 using pyOpenMS. It handles peptide sequence processing, modifications, and m/z calculations.
 """
 
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, Union, List
 from dataclasses import dataclass
 import re
 
@@ -263,6 +263,7 @@ def apply_modification(sequence: str, modification: str) -> str:
     mod_mapping = {
         "Oxidation (M)": {"id": "Oxidation", "aa": "M"},
         "Carbamidomethyl (C)": {"id": "Carbamidomethyl", "aa": "C"},
+        "Carboxymethyl (C)": {"id": "Carboxymethyl", "aa": "C"},
         "Phosphorylation (S/T/Y)": {"id": "Phospho", "aa": ["S", "T", "Y"]},
         "Acetylation (N-term)": {"id": "Acetyl", "terminal": "N"},
         "Methylation (K/R)": {"id": "Methyl", "aa": ["K", "R"]},
@@ -293,8 +294,38 @@ def apply_modification(sequence: str, modification: str) -> str:
     return sequence
 
 
+def calculate_peptide_mz_range(
+    sequence: str,
+    charge_range: Tuple[int, int],
+    modification: Union[str, List[str]] = "None",
+) -> Dict[str, Any]:
+    """Calculate m/z ratios for multiple charge states.
+
+    Args:
+        sequence (str): The peptide sequence
+        charge_range (Tuple[int, int]): Min and max charge states (inclusive)
+        modification (Union[str, List[str]]): Modification(s) to apply
+
+    Returns:
+        Dict containing results for all charge states
+    """
+    min_charge, max_charge = charge_range
+    charge_results = {}
+
+    for charge in range(min_charge, max_charge + 1):
+        result = calculate_peptide_mz(sequence, charge, modification)
+        charge_results[charge] = result
+
+    base_result = charge_results[min_charge]
+    return {
+        **base_result,
+        "charge_results": charge_results,
+        "charge_range": charge_range,
+    }
+
+
 def calculate_peptide_mz(
-    sequence: str, charge_state: int, modification: str = "None"
+    sequence: str, charge_state: int, modification: Union[str, List[str]] = "None"
 ) -> Dict[str, Any]:
     """Calculate the m/z ratio and related properties for a peptide.
 
@@ -302,7 +333,9 @@ def calculate_peptide_mz(
         sequence (str): The peptide sequence. Can contain modifications in square brackets
                         and/or charge notation (e.g., "PEPTIDE/2", "M[Oxidation]PEPTIDE/3").
         charge_state (int): The charge state - will be overridden if charge notation is found.
-        modification (str): Additional modification to apply from dropdown. Defaults to "None".
+        modification (Union[str, List[str]]): Additional modification(s) to apply from dropdown.
+                                            Can be a single modification string or a list of modifications.
+                                            Defaults to "None".
 
     Returns:
         Dict[str, Any]: A dictionary containing calculation results including:
@@ -376,16 +409,41 @@ def calculate_peptide_mz(
     if not all(aa in valid_aa for aa in clean_sequence if aa.isalpha()):
         raise ValueError(f"Invalid amino acids found in sequence: {clean_sequence}")
 
-    # Handle modifications
     if proforma_direct:
         modified_sequence_str = openms_sequence
         applied_modification = "ProForma arbitrary mass deltas (direct parsing)"
     elif openms_sequence != clean_sequence:
         modified_sequence_str = openms_sequence
         applied_modification = "From sequence notation (converted)"
+
+        if isinstance(modification, list):
+            if modification:
+                for mod in modification:
+                    modified_sequence_str = apply_modification(
+                        modified_sequence_str, mod
+                    )
+                applied_modification += " + " + ", ".join(modification)
+        else:
+            if modification != "None":
+                modified_sequence_str = apply_modification(
+                    modified_sequence_str, modification
+                )
+                applied_modification += " + " + modification
     else:
-        modified_sequence_str = apply_modification(clean_sequence, modification)
-        applied_modification = modification
+        if isinstance(modification, list):
+            if modification:
+                modified_sequence_str = clean_sequence
+                for mod in modification:
+                    modified_sequence_str = apply_modification(
+                        modified_sequence_str, mod
+                    )
+                applied_modification = ", ".join(modification)
+            else:
+                modified_sequence_str = clean_sequence
+                applied_modification = "None"
+        else:
+            modified_sequence_str = apply_modification(clean_sequence, modification)
+            applied_modification = modification
 
     try:
         aa_sequence_obj = poms.AASequence.fromString(modified_sequence_str)
@@ -398,6 +456,8 @@ def calculate_peptide_mz(
     mono_weight = aa_sequence_obj.getMonoWeight()
     formula = aa_sequence_obj.getFormula()
 
+    standardized_modified_sequence = aa_sequence_obj.toString()
+
     # Calculate amino acid composition
     aa_composition = {}
     for aa_char in clean_sequence:
@@ -409,7 +469,7 @@ def calculate_peptide_mz(
         "monoisotopic_mass": mono_weight,
         "molecular_formula": formula.toString(),
         "original_sequence": clean_sequence,
-        "modified_sequence": modified_sequence_str,
+        "modified_sequence": standardized_modified_sequence,
         "charge_state": final_charge_state,
         "charge_source": charge_source,
         "modification": applied_modification,
@@ -430,6 +490,7 @@ def get_supported_modifications() -> list:
         "None",
         "Oxidation (M)",
         "Carbamidomethyl (C)",
+        "Carboxymethyl (C)",
         "Phosphorylation (S/T/Y)",
         "Acetylation (N-term)",
         "Methylation (K/R)",
