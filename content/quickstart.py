@@ -6,6 +6,7 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, Any, Optional, Tuple
 import streamlit as st
+import pandas as pd
 
 from src.common.common import page_setup, v_space
 
@@ -341,8 +342,6 @@ if calculate_button:
                                     "m/z": f"{charge_data['mz_ratio']:.6f}",
                                 }
                             )
-
-                        import pandas as pd
 
                         df = pd.DataFrame(table_data)
                         st.dataframe(df, use_container_width=True, hide_index=True)
