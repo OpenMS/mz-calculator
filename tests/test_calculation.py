@@ -70,6 +70,7 @@ class TestCalculationFunctions:
 
         # Make ProForma direct parsing fail so it goes to dropdown modification path
         mock_aa_seq_final = mock_pyopenms.AASequence.fromString.return_value
+        mock_aa_seq_final.toString.return_value = "M(Oxidation)PEPTIDE"
         mock_pyopenms.AASequence.fromString.side_effect = [
             Exception("Parse failed"),
             mock_aa_seq_final,
@@ -92,7 +93,9 @@ class TestCalculationFunctions:
             if seq == "M[Oxidation]PEPTIDE":
                 raise Exception("Parse failed")
             else:
-                return mock_pyopenms.AASequence.fromString.return_value
+                mock_aa_seq = mock_pyopenms.AASequence.fromString.return_value
+                mock_aa_seq.toString.return_value = "M(Oxidation)PEPTIDE"
+                return mock_aa_seq
 
         mock_pyopenms.AASequence.fromString.side_effect = mock_from_string_side_effect
 
@@ -205,6 +208,7 @@ class TestCalculationFunctions:
         self, mock_charge, mock_parse, mock_pyopenms
     ):
         default_return_value = mock_pyopenms.AASequence.fromString.return_value
+        default_return_value.toString.return_value = ".(Acetyl)M(Oxidation)PEPTIDEC(Carbamidomethyl)"
 
         def from_string_side_effect(seq):
             if seq == ".[Acetyl]M[Oxidation]PEPTIDEC[Carbamidomethyl]":
@@ -273,6 +277,7 @@ class TestCalculationFunctions:
                 mock_aa_seq.getFormula.return_value.toString.return_value = (
                     "C31H48N10O9"
                 )
+                mock_aa_seq.toString.return_value = "RTAAX[367.0537]WT"
                 return mock_aa_seq
 
         mock_pyopenms.AASequence.fromString.side_effect = mock_from_string

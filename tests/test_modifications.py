@@ -218,11 +218,12 @@ class TestModificationApplication:
         assert "None" in modifications
         assert "Oxidation (M)" in modifications
         assert "Carbamidomethyl (C)" in modifications
+        assert "Carboxymethyl (C)" in modifications
         assert "Phosphorylation (S/T/Y)" in modifications
         assert "Acetylation (N-term)" in modifications
         assert "Methylation (K/R)" in modifications
         assert "Deamidation (N/Q)" in modifications
-        assert len(modifications) == 7  # Expected number of modifications
+        assert len(modifications) == 8  # Expected number of modifications
 
     def test_get_modification_info(self, mock_pyopenms):
         """Test getting detailed modification information."""

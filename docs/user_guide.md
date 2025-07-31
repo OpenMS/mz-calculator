@@ -104,7 +104,7 @@ ALSSC[UNIMOD:4]VVDEEQDVER/2         # UNIMOD + charge notation
 - **Charge State**: Final charge state used (with source indicator)
 
 ### Sequence Information
-- **Original Sequence**: Clean amino acid sequence
+- **Stripped Sequence**: Clean amino acid sequence
 - **Modified Sequence**: Sequence with applied modifications
 - **Molecular Formula**: Chemical formula of the peptide
 
